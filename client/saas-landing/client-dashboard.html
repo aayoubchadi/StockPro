@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StockPilot - Client Dashboard</title>
+    <meta name="description" content="Client dashboard" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-dashboard="client">
+    <div class="page-bg" aria-hidden="true">
+      <span class="blob blob-a"></span>
+      <span class="blob blob-b"></span>
+      <span class="blob blob-c"></span>
+    </div>
+
+    <header class="site-header">
+      <a href="./index.html" class="brand">
+        <span class="brand-mark">S</span>
+        <span class="brand-text">StockPilot</span>
+      </a>
+      <div class="header-actions">
+        <a href="./index.html" class="btn btn-ghost">Accueil</a>
+        <button id="logoutBtn" class="btn btn-secondary" type="button">Deconnexion</button>
+      </div>
+    </header>
+
+    <main class="section section-shell">
+      <section class="dashboard-head">
+        <p class="eyebrow">Client dashboard</p>
+        <h1>Bonjour <span id="userName">Client</span></h1>
+        <p>Compte: <strong id="userEmail">-</strong> | Role: <strong id="userRole">client</strong></p>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="dashboard-box">
+          <h3>Mes commandes</h3>
+          <p>12 commandes en cours</p>
+        </article>
+        <article class="dashboard-box">
+          <h3>Livraisons</h3>
+          <p>3 livraisons aujourd'hui</p>
+        </article>
+        <article class="dashboard-box">
+          <h3>Tickets SAV</h3>
+          <p>2 tickets ouverts</p>
+        </article>
+      </section>
+    </main>
+
+    <script src="./auth.js"></script>
+  </body>
+</html>

@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StockPilot - SaaS Landing</title>
+    <meta name="description" content="StockPilot modern SaaS landing with GSAP animations" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-bg" aria-hidden="true">
+      <span class="blob blob-a"></span>
+      <span class="blob blob-b"></span>
+      <span class="blob blob-c"></span>
+    </div>
+
+    <header class="site-header">
+      <a href="#top" class="brand">
+        <span class="brand-mark">S</span>
+        <span class="brand-text">StockPilot</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#product">Product</a>
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+      </nav>
+      <div class="header-actions">
+        <a href="./login.html" class="btn btn-ghost">Connexion</a>
+        <a href="#pricing" class="btn btn-secondary">Start Trial</a>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero section section-shell">
+        <div class="hero-copy">
+          <p class="hero-eyebrow hero-item">Your ally for stock operations</p>
+          <h1 class="hero-title hero-item">
+            Run inventory, orders and finance from one clean dashboard.
+          </h1>
+          <p class="hero-subtitle hero-item">
+            Automate stock updates, track margins in real-time, and keep your team in sync with a modern SaaS workspace.
+          </p>
+          <div class="hero-actions hero-item">
+            <a href="#pricing" class="btn btn-primary">Try for free</a>
+            <a href="#product" class="btn btn-ghost">Watch demo</a>
+          </div>
+        </div>
+
+        <div class="hero-visual parallax-layer" data-speed="0.25">
+          <div class="hero-chip chip-a">Live stock sync</div>
+          <div class="hero-chip chip-b">+18% order velocity</div>
+          <div class="dashboard-card">
+            <aside class="dashboard-sidebar" aria-hidden="true">
+              <div class="side-dot"></div>
+              <div class="side-line"></div>
+              <div class="side-line short"></div>
+              <div class="side-line"></div>
+            </aside>
+            <div class="dashboard-main">
+              <div class="dashboard-top">
+                <div>
+                  <p class="label">Stock Value</p>
+                  <p class="counter" data-target="428000">0</p>
+                </div>
+                <div class="pill">Updated 2m ago</div>
+              </div>
+              <div class="bar-chart" aria-label="Demo chart">
+                <span class="bar" data-height="72"></span>
+                <span class="bar" data-height="46"></span>
+                <span class="bar" data-height="86"></span>
+                <span class="bar" data-height="60"></span>
+                <span class="bar" data-height="96"></span>
+              </div>
+              <div class="dashboard-metrics">
+                <div class="metric">
+                  <p class="label">Low stock alerts</p>
+                  <p class="counter" data-target="23">0</p>
+                </div>
+                <div class="metric">
+                  <p class="label">Orders today</p>
+                  <p class="counter" data-target="154">0</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="product" class="section section-shell reveal">
+        <div class="section-head">
+          <p class="eyebrow">Product demo</p>
+          <h2>Built for operators who need speed and control.</h2>
+        </div>
+        <div class="demo-grid">
+          <article class="demo-panel image-reveal">
+            <h3>Command center dashboard</h3>
+            <p>Monitor order flow, stock turns, and profit with a single operational timeline.</p>
+          </article>
+          <article class="demo-panel image-reveal">
+            <h3>Connected stock engine</h3>
+            <p>Every purchase and sale updates your inventory instantly across all locations.</p>
+          </article>
+          <article class="demo-panel image-reveal">
+            <h3>Automated supplier tasks</h3>
+            <p>Generate purchase orders, alerts and replenishment rules with fewer clicks.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="features" class="section section-shell feature-stack">
+        <article class="feature-row reveal">
+          <div class="feature-text">
+            <p class="eyebrow">01. Sales automation</p>
+            <h3>From quote to invoice in one smooth flow.</h3>
+            <p>Convert quotes, track deliveries and get paid faster with integrated payment links.</p>
+            <a href="#pricing" class="inline-link">Explore sales tools</a>
+          </div>
+          <div class="feature-media image-reveal"></div>
+        </article>
+
+        <article class="feature-row reverse reveal">
+          <div class="feature-text">
+            <p class="eyebrow">02. Real-time inventory</p>
+            <h3>See every movement across warehouses instantly.</h3>
+            <p>Batch tracking, threshold alerts, and inventory valuation all available in one timeline.</p>
+            <a href="#pricing" class="inline-link">Explore stock tools</a>
+          </div>
+          <div class="feature-media image-reveal"></div>
+        </article>
+
+        <article class="feature-row reveal">
+          <div class="feature-text">
+            <p class="eyebrow">03. Purchasing workflows</p>
+            <h3>Prevent stockouts with smart replenishment rules.</h3>
+            <p>Plan supplier orders with demand signals and approvals that fit your process.</p>
+            <a href="#pricing" class="inline-link">Explore purchasing tools</a>
+          </div>
+          <div class="feature-media image-reveal"></div>
+        </article>
+      </section>
+
+      <section class="section section-shell reveal">
+        <div class="section-head">
+          <p class="eyebrow">Why teams switch</p>
+          <h2>Practical features, premium feel.</h2>
+        </div>
+        <div class="card-grid stagger-cards">
+          <article class="feature-card">
+            <h4>Fast onboarding</h4>
+            <p>Deploy in days, not months, with guided setup and templates.</p>
+          </article>
+          <article class="feature-card">
+            <h4>Fluid collaboration</h4>
+            <p>Shared workspaces for sales, ops and accounting in one source of truth.</p>
+          </article>
+          <article class="feature-card">
+            <h4>Reliable automation</h4>
+            <p>Trigger actions from stock events and reduce repetitive manual tasks.</p>
+          </article>
+          <article class="feature-card">
+            <h4>Actionable analytics</h4>
+            <p>Track KPIs by warehouse, product family and period with clear trends.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="pricing" class="section section-shell reveal">
+        <div class="pricing-box">
+          <div>
+            <p class="eyebrow">Start now</p>
+            <h2>Try StockPilot free for 15 days.</h2>
+            <p>No credit card required. Cancel anytime.</p>
+          </div>
+          <a href="#top" class="btn btn-primary">Start free trial</a>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/bundled/lenis.min.js"></script>
+    <script src="./script.js"></script>
+  </body>
+</html>
