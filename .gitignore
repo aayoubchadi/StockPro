@@ -1,0 +1,14 @@
+# Node
+node_modules/
+.DS_Store
+/dist
+/*.log
+
+# Vite
+node_modules/
+.vite
+
+# NPM
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
