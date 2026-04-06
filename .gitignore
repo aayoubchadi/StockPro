@@ -1,8 +1,10 @@
 # Node
 node_modules/
 .DS_Store
-/dist
+dist/
+**/dist/
 /*.log
+*.log
 
 # Vite
 node_modules/

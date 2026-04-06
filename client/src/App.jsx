@@ -14,9 +14,12 @@ const App = () => {
           </div>
         </div>
         <nav className="site-nav">
-          <NavLink to="/" end>Accueil</NavLink>
-          <NavLink to="/login">Connexion</NavLink>
-          <a href="#contact" className="btn btn-ghost">Contact</a>
+          <a href="#features">Fonctionnalites</a>
+          <a href="#integrations">Integrations</a>
+          <a href="#testimonials">Temoignages</a>
+          <a href="#why">Pourquoi Stage FE</a>
+          <a href="/login" className="btn btn-ghost">Connexion</a>
+          <NavLink to="/login" className="btn btn-primary">Essai gratuit</NavLink>
         </nav>
       </header>
 
