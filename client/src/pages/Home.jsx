@@ -21,6 +21,8 @@ const Home = () => {
           </div>
         </div>
         <div className="hero-visual slide-up delay-1">
+          <div className="float-badge float-badge--one">+189K actions traitees</div>
+          <div className="float-badge float-badge--two">Stock sync en temps reel</div>
           <div className="card visual-card">
             <div className="card-header">Tableau de bord en temps reel</div>
             <div className="card-body">
@@ -141,7 +143,7 @@ const Home = () => {
       <section id="testimonials" className="section testimonial-section">
         <div className="section-head">
           <p className="eyebrow">Temoignages</p>
-          <h2>Pourquoi les PME sont seduites par Stage FE ?</h2>
+          <h2>Pourquoi les PME sont seduites par StockPilot ?</h2>
         </div>
         <div className="testimonial-grid">
           <article className="quote-card">
@@ -170,7 +172,7 @@ const Home = () => {
 
       <section id="why" className="section cta-section">
         <div className="cta-card">
-          <h2>Pourquoi choisir Stage FE ?</h2>
+          <h2>Pourquoi choisir StockPilot ?</h2>
           <p>
             Gagnez du temps, améliorez la collaboration de votre equipe et
             securisez vos donnees avec une plateforme unique.
@@ -206,8 +208,8 @@ const Home = () => {
           <a href="#">FAQ</a>
         </div>
         <div>
-          <h4>Stage FE</h4>
-          <p>Avec Stage FE, gerez votre activite commerciale avec serenite.</p>
+          <h4>StockPilot</h4>
+          <p>Avec StockPilot, gerez votre stock et votre activite avec serenite.</p>
           <a href="/login" className="btn btn-secondary">Essayer gratuitement</a>
         </div>
       </footer>

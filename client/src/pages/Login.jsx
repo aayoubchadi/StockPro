@@ -31,7 +31,7 @@ const Login = () => {
         <div className="login-panel">
           <div className="panel-header">
             <span>Bienvenue</span>
-            <p>Connectez-vous a votre espace Stage FE.</p>
+            <p>Connectez-vous a votre espace StockPilot.</p>
           </div>
 
           <form className="login-form" onSubmit={(e) => e.preventDefault()}>

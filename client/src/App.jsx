@@ -9,15 +9,15 @@ const App = () => {
         <div className="brand">
           <div className="brand-mark">S</div>
           <div>
-            <strong>Stage</strong>
-            <span>FE</span>
+            <strong>Stock</strong>
+            <span>Pilot</span>
           </div>
         </div>
         <nav className="site-nav">
           <a href="#features">Fonctionnalites</a>
           <a href="#integrations">Integrations</a>
           <a href="#testimonials">Temoignages</a>
-          <a href="#why">Pourquoi Stage FE</a>
+          <a href="#why">Pourquoi StockPilot</a>
           <a href="/login" className="btn btn-ghost">Connexion</a>
           <NavLink to="/login" className="btn btn-primary">Essai gratuit</NavLink>
         </nav>

@@ -129,6 +129,28 @@ img {
   font-size: 0.95rem;
 }
 
+.site-nav a:not(.btn) {
+  position: relative;
+  padding-bottom: 3px;
+}
+
+.site-nav a:not(.btn)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue-500), var(--teal-500));
+  transition: width 240ms ease;
+}
+
+.site-nav a:not(.btn):hover::after,
+.site-nav a.active:not(.btn)::after {
+  width: 100%;
+}
+
 .site-nav .btn {
   margin-left: 2px;
 }
@@ -149,10 +171,28 @@ img {
   transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
   border: 0;
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 70%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transform: skewX(-20deg);
+  transition: left 380ms ease;
 }
 
 .btn:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+}
+
+.btn:hover::before {
+  left: 140%;
 }
 
 .btn-primary {
@@ -272,6 +312,31 @@ img {
 .hero-visual {
   display: grid;
   place-items: center;
+  position: relative;
+}
+
+.float-badge {
+  position: absolute;
+  z-index: 2;
+  font-size: 0.75rem;
+  color: var(--ink-700);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 24px rgba(18, 32, 67, 0.1);
+  border-radius: 999px;
+  padding: 8px 12px;
+  animation: bob 4s ease-in-out infinite;
+}
+
+.float-badge--one {
+  top: 8%;
+  left: 0;
+}
+
+.float-badge--two {
+  right: 0;
+  bottom: 9%;
+  animation-delay: 0.65s;
 }
 
 .visual-card {
@@ -282,6 +347,12 @@ img {
   border: 1px solid var(--line);
   padding: 32px;
   box-shadow: 0 28px 56px rgba(18, 32, 67, 0.11);
+  transition: transform 280ms ease, box-shadow 280ms ease;
+}
+
+.visual-card:hover {
+  transform: translateY(-8px) rotateX(3deg) rotateY(-3deg);
+  box-shadow: 0 38px 66px rgba(18, 32, 67, 0.18);
 }
 
 .card-header {
@@ -336,6 +407,13 @@ img {
   border: 1px solid var(--line);
   min-height: 230px;
   box-shadow: 0 12px 24px rgba(18, 32, 67, 0.04);
+  transition: transform 260ms ease, box-shadow 260ms ease, border-color 260ms ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-8px);
+  border-color: #b9d0f8;
+  box-shadow: 0 20px 34px rgba(18, 32, 67, 0.11);
 }
 
 .feature-icon {
@@ -372,6 +450,12 @@ img {
   background: #fff;
   box-shadow: 0 16px 34px rgba(18, 32, 67, 0.06);
   border: 1px solid var(--line);
+  transition: transform 260ms ease, box-shadow 260ms ease;
+}
+
+.feature-panel:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 24px 42px rgba(18, 32, 67, 0.13);
 }
 
 .panel-alt {
@@ -406,6 +490,12 @@ img {
   border: 1px solid var(--line);
   border-radius: 20px;
   padding: 24px;
+  transition: transform 250ms ease, box-shadow 250ms ease;
+}
+
+.integration-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 32px rgba(18, 32, 67, 0.11);
 }
 
 .integration-card h3 {
@@ -435,6 +525,12 @@ img {
   border-radius: 20px;
   padding: 24px;
   box-shadow: 0 12px 24px rgba(18, 32, 67, 0.05);
+  transition: transform 250ms ease, box-shadow 250ms ease;
+}
+
+.quote-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 22px 34px rgba(18, 32, 67, 0.12);
 }
 
 .quote-card p {
@@ -466,6 +562,8 @@ img {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  animation: drift 15s linear infinite;
+  transform-origin: center;
 }
 
 .trust-inline span {
@@ -476,6 +574,12 @@ img {
   font-weight: 700;
   font-size: 0.86rem;
   color: var(--ink-700);
+  transition: transform 220ms ease, border-color 220ms ease;
+}
+
+.trust-inline span:hover {
+  transform: translateY(-3px);
+  border-color: #bfd4f8;
 }
 
 .cta-section {
@@ -557,6 +661,13 @@ img {
   background: #fff;
   box-shadow: 0 20px 44px rgba(18, 32, 67, 0.1);
   padding: 40px;
+  transition: transform 260ms ease, box-shadow 260ms ease;
+}
+
+.login-panel:hover,
+.login-side:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 28px 52px rgba(18, 32, 67, 0.16);
 }
 
 .login-side {
@@ -676,6 +787,30 @@ img {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes bob {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes drift {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(8px);
+  }
+  100% {
+    transform: translateX(0);
   }
 }
 
