@@ -1,17 +1,27 @@
 # Backend
 
-This folder is reserved for the API and server-side implementation.
+This folder contains the Express API scaffold for StockPro.
 
-Suggested starting structure:
+## Structure
 
 ```
 backend/
 ├── src/
-│   ├── config/
-│   ├── controllers/
 │   ├── middleware/
 │   ├── routes/
-│   └── app.js
-├── package.json
-└── .env
+│   ├── app.js
+│   └── server.js
+└── package.json
 ```
+
+## Scripts
+
+```bash
+npm run dev
+npm start
+```
+
+## Endpoints
+
+- `GET /` returns a simple API status payload.
+- `GET /health` returns uptime and timestamp for basic monitoring.
