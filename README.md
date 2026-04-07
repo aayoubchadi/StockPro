@@ -1,166 +1,75 @@
-# Stage-FE — Corporate Stock Management App
+# Stage-FE
 
-A full-stack web application designed to help corporations efficiently manage their inventory and stock operations.
+Repository layout for the stock management project.
 
----
-
-## 📋 Project Overview
-
-This project is a **Stock Management System** built for corporate use. It provides a centralised platform to track products, manage warehouses, monitor stock levels, process incoming and outgoing shipments, and generate reports — all through a clean, responsive web interface.
-
----
-
-## 🚀 Tech Stack
-
-| Layer       | Technology                          |
-|-------------|-------------------------------------|
-| Frontend    | **React.js** (with React Router, Context API / Redux) |
-| Backend     | **Node.js** with **Express.js**     |
-| Database    | **Oracle Express Edition (XE)** or **PostgreSQL** |
-| API Style   | RESTful API (JSON)                  |
-
----
-
-## 🗂️ Key Features
-
-### Inventory Management
-- Add, update, and delete products (name, SKU, description, category, unit price)
-- Track current stock quantities per product and per warehouse
-- Set minimum stock thresholds and receive low-stock alerts
-
-### Warehouse & Location Management
-- Manage multiple warehouses or storage locations
-- Assign stock to specific locations within a warehouse
-
-### Stock Movements
-- Record incoming stock (supplier deliveries / purchase orders)
-- Record outgoing stock (sales orders / internal transfers)
-- Full movement history with timestamps and responsible user
-
-### Order Management
-- Create and track purchase orders (inbound) and sales/dispatch orders (outbound)
-- Order status workflow: *Pending → Confirmed → Shipped → Received/Delivered*
-
-### Reporting & Dashboard
-- Real-time dashboard showing total stock value, low-stock items, and recent activity
-- Exportable reports (stock levels, movement history, orders)
-
-### User Management & Authentication
-- Role-based access control (Admin, Manager, Warehouse Staff)
-- Secure login with JWT-based authentication
-
----
-
-## 🏗️ Project Structure (planned)
+## Structure
 
 ```
 Stage-FE/
-├── client/                  # React frontend
-│   ├── public/
-│   └── src/
-│       ├── components/      # Reusable UI components
-│       ├── pages/           # Page-level components (Dashboard, Products, Orders…)
-│       ├── services/        # API call helpers (axios)
-│       ├── store/           # State management (Context API or Redux)
-│       └── App.jsx
-│
-├── server/                  # Node.js + Express backend
-│   ├── config/              # Database connection config
-│   ├── controllers/         # Route handler logic
-│   ├── middleware/          # Auth, error handling
-│   ├── models/              # Database models / query helpers
-│   ├── routes/              # Express route definitions
-│   └── index.js             # Entry point
-│
+├── package.json  # Root workspace scripts
+├── frontend/   # React + Vite application
+├── backend/    # API and server-side code
 └── README.md
 ```
 
----
+## Frontend
 
-## 🗄️ Database
+The React app lives in [frontend](frontend). It uses Vite and contains the current UI delivered in the first push.
 
-The application supports two database options:
+Inside the frontend, the source code now follows a clearer React structure:
 
-- **Oracle Express Edition (XE)** — suitable for enterprise environments already using Oracle infrastructure.
-- **PostgreSQL** — a powerful, open-source relational database ideal for cloud deployments.
-
-Both options use relational schemas with tables for Products, Categories, Warehouses, Stock, Orders, Order Lines, Users, and Audit Logs.
-
----
-
-## ⚙️ Getting Started
-
-### Prerequisites
-- Node.js ≥ 18
-- npm or yarn
-- Oracle XE or PostgreSQL installed and running
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/aayoubchadi/Stage-FE.git
-cd Stage-FE
-
-# Install backend dependencies
-cd server
-npm install
-
-# Install frontend dependencies
-cd ../client
-npm install
+```
+frontend/src/
+├── pages/
+│   ├── auth/
+│   └── public/
+├── routes/
+├── styles/
+├── components/
+├── layouts/
+├── hooks/
+└── services/
 ```
 
-### Configuration
+## Backend
 
-Create a `.env` file inside the `server/` directory:
+[backend](backend) now contains a minimal Express API scaffold with a root health check and ready-to-extend middleware/routes layout.
 
-```env
-# General
-PORT=5000
-JWT_SECRET=your_jwt_secret_here
+Backend structure:
 
-# PostgreSQL example
-DB_CLIENT=pg
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=stock_management
-DB_USER=your_db_user
-DB_PASSWORD=your_db_password
-
-# Oracle XE example (alternative)
-# DB_CLIENT=oracledb
-# DB_CONNECT_STRING=localhost/XEPDB1
-# DB_USER=your_oracle_user
-# DB_PASSWORD=your_oracle_password
+```
+backend/
+├── src/
+│   ├── middleware/
+│   ├── routes/
+│   ├── app.js
+│   └── server.js
+└── package.json
 ```
 
-### Running the App
+## Running the frontend
 
 ```bash
-# Start the backend (from server/)
+npm install
+npm run dev --workspace frontend
+```
+
+## Running the backend
+
+```bash
+npm install
+npm run dev --workspace backend
+```
+
+## Running both
+
+```bash
+npm install
 npm run dev
-
-# Start the frontend (from client/)
-npm start
 ```
 
-The React app will be available at `http://localhost:3000` and the API at `http://localhost:5000`.
+The frontend starts on Vite's default port, and the API starts on `http://localhost:5000` by default.
 
----
+## Notes
 
-## 🧪 Testing
-
-```bash
-# Backend tests
-cd server && npm test
-
-# Frontend tests
-cd client && npm test
-```
-
----
-
-## 📄 License
-
-This project is developed as part of an internship (stage). All rights reserved.
+The old single-folder `client` layout has been replaced so the repo can grow cleanly as a full-stack project.

@@ -1,4 +1,6 @@
-const Home = () => {
+import { Link } from 'react-router-dom';
+
+const HomePage = () => {
   return (
     <div className="home-page">
       <section className="hero section-large">
@@ -10,7 +12,7 @@ const Home = () => {
             fini les erreurs de saisie et les ruptures de stocks.
           </p>
           <div className="hero-actions">
-            <a href="/login" className="btn btn-primary">Essayer gratuitement</a>
+            <Link to="/login" className="btn btn-primary">Essayer gratuitement</Link>
             <a href="#features" className="btn btn-secondary">Demander une demo</a>
           </div>
           <div className="hero-tags">
@@ -184,7 +186,7 @@ const Home = () => {
             <span>Support reactif</span>
             <span>Securite renforcee</span>
           </div>
-          <a href="/login" className="btn btn-primary">Commencer maintenant</a>
+          <Link to="/login" className="btn btn-primary">Commencer maintenant</Link>
         </div>
       </section>
 
@@ -210,11 +212,11 @@ const Home = () => {
         <div>
           <h4>StockPilot</h4>
           <p>Avec StockPilot, gerez votre stock et votre activite avec serenite.</p>
-          <a href="/login" className="btn btn-secondary">Essayer gratuitement</a>
+          <Link to="/login" className="btn btn-secondary">Essayer gratuitement</Link>
         </div>
       </footer>
     </div>
   );
 };
 
-export default Home;
+export default HomePage;
