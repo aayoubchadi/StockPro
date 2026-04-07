@@ -1,6 +1,7 @@
+import { Link } from 'react-router-dom';
 import { useState } from 'react';
 
-const Login = () => {
+const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -34,7 +35,7 @@ const Login = () => {
             <p>Connectez-vous a votre espace StockPilot.</p>
           </div>
 
-          <form className="login-form" onSubmit={(e) => e.preventDefault()}>
+          <form className="login-form" onSubmit={(event) => event.preventDefault()}>
             <label>
               Adresse email
               <input
@@ -60,7 +61,7 @@ const Login = () => {
 
           <div className="login-footer">
             <a href="#">Mot de passe oublié ?</a>
-            <a href="#">Creer un compte</a>
+            <Link to="/">Retour à l'accueil</Link>
           </div>
         </div>
       </div>
@@ -68,4 +69,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default LoginPage;

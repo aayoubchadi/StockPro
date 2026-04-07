@@ -15,6 +15,21 @@ Stage-FE/
 
 The React app lives in [frontend](frontend). It uses Vite and contains the current UI delivered in the first push.
 
+Inside the frontend, the source code now follows a clearer React structure:
+
+```
+frontend/src/
+├── pages/
+│   ├── auth/
+│   └── public/
+├── routes/
+├── styles/
+├── components/
+├── layouts/
+├── hooks/
+└── services/
+```
+
 ## Backend
 
 [backend](backend) is reserved for the API, server logic, database access, and future auth/reporting work.
