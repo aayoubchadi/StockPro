@@ -102,3 +102,27 @@ Then request `GET /health`. The response includes database status when connectio
 
 - `GET /` returns a simple API status payload.
 - `GET /health` returns uptime, timestamp, and PostgreSQL connectivity status.
+
+## Stable Dev Runbook
+
+1. Install workspace dependencies from the repository root.
+2. Confirm `backend/.env` exists. Use `backend/.env.example` as the source of truth for required keys.
+3. Ensure these variables are set:
+   - `DB_HOST`
+   - `DB_NAME`
+   - `DB_USER`
+   - `DB_PASSWORD`
+4. Keep these values numeric if overridden:
+   - `PORT`
+   - `DB_PORT`
+   - `DB_POOL_MAX`
+   - `DB_IDLE_TIMEOUT_MS`
+   - `DB_CONNECTION_TIMEOUT_MS`
+5. Start the backend with `npm run dev` from the repository root or `npm run dev --workspace backend`.
+6. If startup fails, fix the env file first. The server validates the contract before accepting traffic.
+
+Verification checks:
+
+- Local startup succeeds with the current configuration.
+- Blank `DB_PASSWORD` fails during startup.
+- Non-numeric `DB_PORT` fails during startup.

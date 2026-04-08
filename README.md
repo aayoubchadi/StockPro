@@ -105,3 +105,36 @@ For full backend setup details, see [backend/README.md](backend/README.md).
 ## Notes
 
 The old single-folder `client` layout has been replaced so the repo can grow cleanly as a full-stack project.
+
+## Project Setup Checklist
+
+- [x] Backend setup path is documented and verified in the local workspace.
+- [x] Backend startup contract is enforced in a clean config scenario.
+- [x] The backend environment-variable contract is frozen at startup.
+- [x] Startup validation covers required and numeric env values.
+- [x] The stable backend development runbook is documented.
+
+## Stable Dev Runbook
+
+1. Install dependencies from the repository root.
+2. Confirm `backend/.env` exists. If needed, copy `backend/.env.example` to `backend/.env`.
+3. Set the required backend variables in `backend/.env`:
+   - `DB_HOST`
+   - `DB_NAME`
+   - `DB_USER`
+   - `DB_PASSWORD`
+4. Keep numeric values valid:
+   - `PORT`
+   - `DB_PORT`
+   - `DB_POOL_MAX`
+   - `DB_IDLE_TIMEOUT_MS`
+   - `DB_CONNECTION_TIMEOUT_MS`
+5. Start both apps with `npm run dev` from the repository root.
+6. If the backend fails fast, fix the env file first. The startup validation is intentional.
+
+Known-good validation results:
+
+- Backend starts successfully with the current local configuration.
+- Missing or blank `DB_PASSWORD` fails fast.
+- Invalid numeric `DB_PORT` fails fast.
+
