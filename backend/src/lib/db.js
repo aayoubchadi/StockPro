@@ -1,15 +1,15 @@
-import 'dotenv/config';
 import { Pool } from 'pg';
+import { env } from '../config/env.js';
 
 const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: Number(process.env.DB_PORT || 9100),
-  database: process.env.DB_NAME || 'stockpro_db',
-  user: process.env.DB_USER || 'stockpro',
-  password: process.env.DB_PASSWORD || '',
-  max: Number(process.env.DB_POOL_MAX || 10),
-  idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || 30000),
-  connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 5000),
+  host: env.dbHost,
+  port: env.dbPort,
+  database: env.dbName,
+  user: env.dbUser,
+  password: env.dbPassword,
+  max: env.dbPoolMax,
+  idleTimeoutMillis: env.dbIdleTimeoutMs,
+  connectionTimeoutMillis: env.dbConnectionTimeoutMs,
 });
 
 export const query = (text, params) => pool.query(text, params);

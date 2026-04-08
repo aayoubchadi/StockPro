@@ -67,20 +67,26 @@ On bash/zsh:
 cp .env.example .env
 ```
 
-### 3) Update Required `.env` Values
+### 3) Environment Contract (Frozen)
 
-You should update these values in `backend/.env`:
+The backend validates environment variables at startup and exits early if values are missing or invalid.
 
-- `DB_HOST` and `DB_PORT`: PostgreSQL host/port in your machine.
-- `DB_NAME`: target database name (default `stockpro_db`).
-- `DB_USER`: application database user (default `stockpro`).
-- `DB_PASSWORD`: your real DB password.
+Required:
 
-Optional tuning values:
+- `DB_HOST`: non-empty string
+- `DB_NAME`: non-empty string
+- `DB_USER`: non-empty string
+- `DB_PASSWORD`: non-empty string
 
-- `DB_POOL_MAX`
-- `DB_IDLE_TIMEOUT_MS`
-- `DB_CONNECTION_TIMEOUT_MS`
+Optional with defaults (must be integer >= 1 when provided):
+
+- `PORT` (default `5000`)
+- `DB_PORT` (default `9100`)
+- `DB_POOL_MAX` (default `10`)
+- `DB_IDLE_TIMEOUT_MS` (default `30000`)
+- `DB_CONNECTION_TIMEOUT_MS` (default `5000`)
+
+If startup fails with env validation errors, check `backend/.env` first.
 
 ### 4) Verify Connection
 
