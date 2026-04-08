@@ -6,6 +6,12 @@ dist/
 /*.log
 *.log
 
+# Environment
+.env
+**/.env
+**/.env.local
+**/.env.*.local
+
 # Vite
 node_modules/
 .vite
