@@ -145,7 +145,7 @@ const HomePage = () => {
       <section id="testimonials" className="section testimonial-section">
         <div className="section-head">
           <p className="eyebrow">Temoignages</p>
-          <h2>Pourquoi les PME sont seduites par StockPilot ?</h2>
+          <h2>Pourquoi les PME sont seduites par StockPro ?</h2>
         </div>
         <div className="testimonial-grid">
           <article className="quote-card">
@@ -174,7 +174,7 @@ const HomePage = () => {
 
       <section id="why" className="section cta-section">
         <div className="cta-card">
-          <h2>Pourquoi choisir StockPilot ?</h2>
+          <h2>Pourquoi choisir StockPro ?</h2>
           <p>
             Gagnez du temps, améliorez la collaboration de votre equipe et
             securisez vos donnees avec une plateforme unique.
@@ -210,8 +210,8 @@ const HomePage = () => {
           <a href="#">FAQ</a>
         </div>
         <div>
-          <h4>StockPilot</h4>
-          <p>Avec StockPilot, gerez votre stock et votre activite avec serenite.</p>
+          <h4>StockPro</h4>
+          <p>Avec StockPro, gerez votre stock et votre activite avec serenite.</p>
           <Link to="/login" className="btn btn-secondary">Essayer gratuitement</Link>
         </div>
       </footer>

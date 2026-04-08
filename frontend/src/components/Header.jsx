@@ -15,7 +15,7 @@ export default function Header({ showNav = true, isDashboard = false }) {
     <header className="site-header">
       <Link to="/" className="brand">
         <span className="brand-mark">S</span>
-        <span className="brand-text">StockPilot</span>
+        <span className="brand-text">StockPro</span>
       </Link>
 
       {showNav && !isDashboard && (

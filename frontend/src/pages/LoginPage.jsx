@@ -53,10 +53,10 @@ export default function LoginPage() {
       <main className="section section-shell auth-main">
         <section className="auth-wrap">
           <p className="eyebrow">Connexion</p>
-          <h1>Bienvenue sur StockPilot</h1>
+          <h1>Bienvenue sur StockPro</h1>
           <p>Connectez-vous pour piloter vos stocks, commandes et fournisseurs.</p>
-          <p className="auth-hint">Test client: client@stockpilot.com / client1234</p>
-          <p className="auth-hint">Test admin: admin@stockpilot.com / admin1234</p>
+          <p className="auth-hint">Test client: client@stockpro.com / client1234</p>
+          <p className="auth-hint">Test admin: admin@stockpro.com / admin1234</p>
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <label>

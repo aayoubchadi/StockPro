@@ -32,7 +32,7 @@ const LoginPage = () => {
         <div className="login-panel">
           <div className="panel-header">
             <span>Bienvenue</span>
-            <p>Connectez-vous a votre espace StockPilot.</p>
+            <p>Connectez-vous a votre espace StockPro.</p>
           </div>
 
           <form className="login-form" onSubmit={(event) => event.preventDefault()}>

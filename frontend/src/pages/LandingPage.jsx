@@ -167,7 +167,7 @@ export default function LandingPage() {
           <div className="pricing-box">
             <div>
               <p className="eyebrow">Start now</p>
-              <h2>Try StockPilot free for 15 days.</h2>
+              <h2>Try StockPro free for 15 days.</h2>
               <p>No credit card required. Cancel anytime.</p>
             </div>
             <a href="#top" className="btn btn-primary">Start free trial</a>

@@ -1,5 +1,5 @@
-const STORAGE_KEY = 'stockpilot_accounts';
-const SESSION_KEY = 'stockpilot_session';
+const STORAGE_KEY = 'stockpro_accounts';
+const SESSION_KEY = 'stockpro_session';
 
 export const getAccounts = () => {
   try {
@@ -40,8 +40,8 @@ export const ensureSeedAccount = () => {
   const accounts = getAccounts();
   let changed = false;
 
-  if (!accounts['client@stockpilot.com']) {
-    accounts['client@stockpilot.com'] = {
+  if (!accounts['client@stockpro.com']) {
+    accounts['client@stockpro.com'] = {
       fullName: 'Client Test',
       password: 'client1234',
       role: 'client',
@@ -49,8 +49,8 @@ export const ensureSeedAccount = () => {
     changed = true;
   }
 
-  if (!accounts['admin@stockpilot.com']) {
-    accounts['admin@stockpilot.com'] = {
+  if (!accounts['admin@stockpro.com']) {
+    accounts['admin@stockpro.com'] = {
       fullName: 'Admin Test',
       password: 'admin1234',
       role: 'admin',
@@ -58,8 +58,8 @@ export const ensureSeedAccount = () => {
     changed = true;
   }
 
-  if (accounts['demo@stockpilot.com'] && !accounts['demo@stockpilot.com'].role) {
-    accounts['demo@stockpilot.com'].role = 'client';
+  if (accounts['demo@stockpro.com'] && !accounts['demo@stockpro.com'].role) {
+    accounts['demo@stockpro.com'].role = 'client';
     changed = true;
   }
 
