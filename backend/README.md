@@ -25,6 +25,17 @@ npm start
 
 This backend uses PostgreSQL.
 
+Current DB role model in this phase:
+
+- `company_admin`: one admin per company with access to that company only
+- `employee`: standard company account under subscription limits
+- `platform master admin`: global account for platform-level administration
+
+Seeded platform master admin (development):
+
+- Email: `stockpro@admin.com`
+- Password: `StockPro@Admin2026`
+
 1. Ensure PostgreSQL is running.
 2. Create the database if it does not already exist.
 3. Run schema and seed scripts.

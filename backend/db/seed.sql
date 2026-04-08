@@ -6,7 +6,18 @@
 -- 1) admin@acme.local     -> Admin@123
 -- 2) employee1@acme.local -> Employee@123
 -- 3) admin@nova.local     -> NovaAdmin@123
+-- 4) stockpro@admin.com   -> StockPro@Admin2026 (platform/master admin)
 -- Password hashes are generated with pgcrypto crypt(..., gen_salt('bf')).
+
+INSERT INTO platform_admins (email, password_hash, full_name, is_active)
+VALUES
+  ('stockpro@admin.com', crypt('StockPro@Admin2026', gen_salt('bf', 10)), 'StockPro Master Admin', TRUE)
+ON CONFLICT (email) DO UPDATE
+SET
+  password_hash = EXCLUDED.password_hash,
+  full_name = EXCLUDED.full_name,
+  is_active = TRUE;
+
 INSERT INTO subscription_plans (code, name, max_employees, can_export_reports, can_use_advanced_analytics)
 VALUES
   ('starter_20', 'Starter 20', 20, FALSE, FALSE),

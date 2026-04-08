@@ -27,6 +27,10 @@ $$;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'account_role') THEN
+    -- Current roles:
+    -- - company_admin: manages only data inside their company/tenant
+    -- - employee: standard company account under subscription limits
+    -- Platform-wide admin role is intentionally not included in this phase.
     CREATE TYPE account_role AS ENUM ('company_admin', 'employee');
   END IF;
 
@@ -35,6 +39,18 @@ BEGIN
   END IF;
 END
 $$;
+
+-- Master/platform admins are global accounts stored outside tenant-scoped users.
+-- They can be used by the platform team to manage all companies from a separate admin flow.
+CREATE TABLE IF NOT EXISTS platform_admins (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email CITEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  full_name VARCHAR(120) NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 CREATE TABLE IF NOT EXISTS subscription_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -128,6 +144,11 @@ CREATE TRIGGER trg_companies_updated_at
 BEFORE UPDATE ON companies
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_platform_admins_updated_at ON platform_admins;
+CREATE TRIGGER trg_platform_admins_updated_at
+BEFORE UPDATE ON platform_admins
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
 DROP TRIGGER IF EXISTS trg_users_updated_at ON users;
 CREATE TRIGGER trg_users_updated_at
 BEFORE UPDATE ON users
@@ -181,6 +202,7 @@ CREATE INDEX IF NOT EXISTS idx_users_company_role ON users(company_id, role);
 CREATE INDEX IF NOT EXISTS idx_products_company_name ON products(company_id, name);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_company_product ON stock_movements(company_id, product_id);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_created_at ON stock_movements(created_at);
+CREATE INDEX IF NOT EXISTS idx_platform_admins_email ON platform_admins(email);
 
 -- Row level security ensures each session can only access its company data.
 -- The backend must execute: SET app.current_company_id = '<company_uuid>' per request/session.

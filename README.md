@@ -74,6 +74,17 @@ The frontend starts on Vite's default port, and the API starts on `http://localh
 
 The backend expects a PostgreSQL database named `stockpro_db`.
 
+Current DB role model in this phase:
+
+- `company_admin`: one admin per company (tenant-scoped)
+- `employee`: company user under subscription employee limits
+- `platform master admin`: global account for the platform team (outside tenant users)
+
+Seeded platform master admin (development):
+
+- Email: `stockpro@admin.com`
+- Password: `StockPro@Admin2026`
+
 From the repository root:
 
 ```powershell
