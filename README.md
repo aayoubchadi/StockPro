@@ -76,7 +76,7 @@ The backend expects a PostgreSQL database named `stockpro_db`.
 
 Current DB role model in this phase:
 
-- `company_admin`: one admin per company (tenant-scoped)
+- `company_admin`: at most one active admin per company (tenant-scoped)
 - `employee`: company user under subscription employee limits
 - `platform master admin`: global account for the platform team (outside tenant users)
 
@@ -89,8 +89,11 @@ From the repository root:
 
 ```powershell
 "C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/schema.sql
+"C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/migrations/2026-04-09_user-model-finalization.sql
 "C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/seed.sql
 ```
+
+The finalized user model contract is documented at `backend/db/contracts/user-schema-contract.md`.
 
 Create a local backend env file:
 

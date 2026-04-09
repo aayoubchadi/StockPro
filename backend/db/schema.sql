@@ -49,7 +49,9 @@ CREATE TABLE IF NOT EXISTS platform_admins (
   full_name VARCHAR(120) NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT ck_platform_admins_email_not_blank CHECK (length(btrim(email::text)) > 0),
+  CONSTRAINT ck_platform_admins_full_name_not_blank CHECK (length(btrim(full_name)) > 0)
 );
 
 CREATE TABLE IF NOT EXISTS subscription_plans (
@@ -84,12 +86,14 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_users_company_email UNIQUE (company_id, email),
-  CONSTRAINT uq_users_company_id_id UNIQUE (company_id, id)
+  CONSTRAINT uq_users_company_id_id UNIQUE (company_id, id),
+  CONSTRAINT ck_users_email_not_blank CHECK (length(btrim(email::text)) > 0),
+  CONSTRAINT ck_users_full_name_not_blank CHECK (length(btrim(full_name)) > 0)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_users_one_admin_per_company
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_one_active_admin_per_company
   ON users(company_id)
-  WHERE role = 'company_admin';
+  WHERE role = 'company_admin' AND is_active = TRUE;
 
 CREATE TABLE IF NOT EXISTS products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -199,6 +203,7 @@ FOR EACH ROW EXECUTE FUNCTION enforce_employee_limit();
 
 CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);
 CREATE INDEX IF NOT EXISTS idx_users_company_role ON users(company_id, role);
+CREATE INDEX IF NOT EXISTS idx_users_company_active ON users(company_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_products_company_name ON products(company_id, name);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_company_product ON stock_movements(company_id, product_id);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_created_at ON stock_movements(created_at);

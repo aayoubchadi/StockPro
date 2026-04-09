@@ -27,7 +27,7 @@ This backend uses PostgreSQL.
 
 Current DB role model in this phase:
 
-- `company_admin`: one admin per company with access to that company only
+- `company_admin`: at most one active admin per company with access to that company only
 - `employee`: standard company account under subscription limits
 - `platform master admin`: global account for platform-level administration
 
@@ -40,6 +40,7 @@ Seeded platform master admin (development):
 2. Create the database if it does not already exist.
 3. Run schema and seed scripts.
 4. Configure backend environment variables.
+5. For existing databases, run migration scripts under `backend/db/migrations/`.
 
 ### 1) Create and Initialize Database
 
@@ -48,8 +49,11 @@ From the repository root, run:
 ```powershell
 "C:\dev\PostGreSQL\bin\createdb.exe" -U postgres -h localhost -p 9100 stockpro_db
 "C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/schema.sql
+"C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/migrations/2026-04-09_user-model-finalization.sql
 "C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/seed.sql
 ```
+
+User schema decisions are locked in `backend/db/contracts/user-schema-contract.md`.
 
 ### 2) Create Local Environment File
 
