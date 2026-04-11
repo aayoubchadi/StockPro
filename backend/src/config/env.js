@@ -49,6 +49,8 @@ export function validateEnvironment() {
   parseInteger('DB_IDLE_TIMEOUT_MS', 30000, 1);
   parseInteger('DB_CONNECTION_TIMEOUT_MS', 5000, 1);
   parseInteger('JWT_ACCESS_TTL_SECONDS', 900, 60);
+  parseInteger('JWT_REFRESH_TTL_SECONDS', 604800, 60);
+  parseInteger('JWT_SESSION_MAX_LIFETIME_SECONDS', 2592000, 60);
   parseInteger('AUTH_RATE_LIMIT_LOGIN_WINDOW_MS', 60000, 1000);
   parseInteger('AUTH_RATE_LIMIT_LOGIN_MAX', 10, 1);
 }
@@ -69,6 +71,12 @@ export const env = {
   jwtAudience: process.env.JWT_AUDIENCE || 'stockpro-client',
   jwtAccessSecret: readRequired('JWT_ACCESS_SECRET'),
   jwtAccessTtlSeconds: parseInteger('JWT_ACCESS_TTL_SECONDS', 900, 60),
+  jwtRefreshTtlSeconds: parseInteger('JWT_REFRESH_TTL_SECONDS', 604800, 60),
+  jwtSessionMaxLifetimeSeconds: parseInteger(
+    'JWT_SESSION_MAX_LIFETIME_SECONDS',
+    2592000,
+    60
+  ),
   authRateLimitLoginWindowMs: parseInteger(
     'AUTH_RATE_LIMIT_LOGIN_WINDOW_MS',
     60000,

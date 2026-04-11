@@ -7,6 +7,16 @@ import { loginRateLimiter } from '../middleware/authRateLimit.js';
 import { env } from '../config/env.js';
 import { validatePasswordPolicy } from '../lib/passwordPolicy.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import {
+  createAuthSession,
+  createRefreshTokenRecord,
+  findRefreshTokenWithSession,
+  markRefreshTokenRotated,
+  revokeSessionById,
+  touchSessionLastUsedAt,
+} from '../lib/authSessionStore.js';
+import { generateRefreshToken, hashRefreshToken } from '../lib/refreshToken.js';
+import { blacklistAccessToken } from '../lib/accessTokenBlacklist.js';
 
 const router = Router();
 
@@ -26,6 +36,66 @@ function isUuid(value) {
 
 function normalizeRole(value) {
   return String(value || 'employee').trim();
+}
+
+function expirationDateFromNow(seconds) {
+  return new Date(Date.now() + seconds * 1000);
+}
+
+function tokenExpToDate(exp) {
+  const value = Number(exp);
+
+  if (!Number.isInteger(value) || value <= 0) {
+    return null;
+  }
+
+  return new Date(value * 1000);
+}
+
+async function issueSessionTokens({
+  principalId,
+  scope,
+  role,
+  companyId,
+  email,
+  ipAddress,
+  userAgent,
+}) {
+  const sessionExpiresAt = expirationDateFromNow(env.jwtSessionMaxLifetimeSeconds);
+  const refreshExpiresAt = expirationDateFromNow(env.jwtRefreshTtlSeconds);
+
+  const session = await createAuthSession({
+    principalId,
+    scope,
+    role,
+    companyId,
+    email,
+    expiresAt: sessionExpiresAt,
+  });
+
+  const refreshToken = generateRefreshToken();
+  const refreshTokenHash = hashRefreshToken(refreshToken);
+
+  await createRefreshTokenRecord({
+    sessionId: session.id,
+    tokenHash: refreshTokenHash,
+    expiresAt: refreshExpiresAt,
+    ipAddress,
+    userAgent,
+  });
+
+  const accessToken = signAccessToken({
+    sub: principalId,
+    role,
+    scope,
+    companyId,
+    email,
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+  };
 }
 
 router.post('/register', async (request, response, next) => {
@@ -247,19 +317,23 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
         );
       }
 
-      const accessToken = signAccessToken({
-        sub: user.id,
-        role: user.role,
+      const tokens = await issueSessionTokens({
+        principalId: user.id,
         scope: 'tenant',
+        role: user.role,
         companyId: user.company_id,
         email: user.email,
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'] || null,
       });
 
       response.json({
         data: {
-          accessToken,
+          accessToken: tokens.accessToken,
           tokenType: 'Bearer',
           expiresIn: env.jwtAccessTtlSeconds,
+          refreshToken: tokens.refreshToken,
+          refreshExpiresIn: env.jwtRefreshTtlSeconds,
           user: {
             id: user.id,
             companyId: user.company_id,
@@ -307,18 +381,23 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
       );
     }
 
-    const accessToken = signAccessToken({
-      sub: admin.id,
-      role: 'platform_admin',
+    const tokens = await issueSessionTokens({
+      principalId: admin.id,
       scope: 'platform',
+      role: 'platform_admin',
+      companyId: null,
       email: admin.email,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
     });
 
     response.json({
       data: {
-        accessToken,
+        accessToken: tokens.accessToken,
         tokenType: 'Bearer',
         expiresIn: env.jwtAccessTtlSeconds,
+        refreshToken: tokens.refreshToken,
+        refreshExpiresIn: env.jwtRefreshTtlSeconds,
         user: {
           id: admin.id,
           companyId: null,
@@ -329,6 +408,123 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
         },
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/refresh', async (request, response, next) => {
+  try {
+    const refreshToken = normalizeValue(request.body.refreshToken);
+
+    if (!refreshToken) {
+      throw new HttpError(
+        400,
+        'AUTH_VALIDATION_ERROR',
+        'refreshToken is required'
+      );
+    }
+
+    const refreshTokenHash = hashRefreshToken(refreshToken);
+    const existingToken = await findRefreshTokenWithSession(refreshTokenHash);
+
+    if (!existingToken) {
+      throw new HttpError(401, 'AUTH_TOKEN_INVALID', 'Invalid refresh token');
+    }
+
+    if (existingToken.session_revoked_at) {
+      throw new HttpError(401, 'AUTH_TOKEN_INVALID', 'Invalid refresh token');
+    }
+
+    if (new Date(existingToken.session_expires_at) <= new Date()) {
+      await revokeSessionById(existingToken.session_id);
+      throw new HttpError(401, 'AUTH_TOKEN_EXPIRED', 'Refresh token expired');
+    }
+
+    if (new Date(existingToken.expires_at) <= new Date()) {
+      await revokeSessionById(existingToken.session_id);
+      throw new HttpError(401, 'AUTH_TOKEN_EXPIRED', 'Refresh token expired');
+    }
+
+    if (existingToken.replaced_by_token_id) {
+      await revokeSessionById(existingToken.session_id);
+      throw new HttpError(401, 'AUTH_REFRESH_REUSED', 'Refresh token reuse detected');
+    }
+
+    if (existingToken.revoked_at) {
+      throw new HttpError(401, 'AUTH_TOKEN_INVALID', 'Invalid refresh token');
+    }
+
+    const nextRefreshToken = generateRefreshToken();
+    const nextRefreshTokenHash = hashRefreshToken(nextRefreshToken);
+    const nextRefreshExpiresAt = expirationDateFromNow(env.jwtRefreshTtlSeconds);
+
+    const nextRefreshRecord = await createRefreshTokenRecord({
+      sessionId: existingToken.session_id,
+      tokenHash: nextRefreshTokenHash,
+      expiresAt: nextRefreshExpiresAt,
+      parentTokenId: existingToken.id,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
+    });
+
+    await markRefreshTokenRotated({
+      tokenId: existingToken.id,
+      replacedByTokenId: nextRefreshRecord.id,
+    });
+
+    await touchSessionLastUsedAt(existingToken.session_id);
+
+    const accessToken = signAccessToken({
+      sub: existingToken.principal_id,
+      role: existingToken.role,
+      scope: existingToken.scope,
+      companyId: existingToken.company_id,
+      email: existingToken.email,
+    });
+
+    response.json({
+      data: {
+        accessToken,
+        tokenType: 'Bearer',
+        expiresIn: env.jwtAccessTtlSeconds,
+        refreshToken: nextRefreshToken,
+        refreshExpiresIn: env.jwtRefreshTtlSeconds,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/logout', requireAuth, async (request, response, next) => {
+  try {
+    const refreshToken = normalizeValue(request.body.refreshToken);
+    const tokenExpiresAt = tokenExpToDate(request.auth.rawClaims.exp);
+
+    if (tokenExpiresAt) {
+      await blacklistAccessToken({
+        jti: request.auth.tokenId,
+        subjectId: request.auth.userId,
+        expiresAt: tokenExpiresAt,
+        reason: 'logout',
+      });
+    }
+
+    if (refreshToken) {
+      const refreshTokenHash = hashRefreshToken(refreshToken);
+      const existingToken = await findRefreshTokenWithSession(refreshTokenHash);
+
+      if (
+        existingToken &&
+        existingToken.principal_id === request.auth.userId &&
+        existingToken.scope === request.auth.scope
+      ) {
+        await revokeSessionById(existingToken.session_id);
+      }
+    }
+
+    response.status(204).send();
   } catch (error) {
     next(error);
   }
