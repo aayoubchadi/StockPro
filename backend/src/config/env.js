@@ -1,6 +1,12 @@
 import 'dotenv/config';
 
-const REQUIRED_ENV_VARS = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
+const REQUIRED_ENV_VARS = [
+  'DB_HOST',
+  'DB_NAME',
+  'DB_USER',
+  'DB_PASSWORD',
+  'JWT_ACCESS_SECRET',
+];
 
 function parseInteger(name, fallback, min = 1) {
   const raw = process.env[name];
@@ -42,6 +48,9 @@ export function validateEnvironment() {
   parseInteger('DB_POOL_MAX', 10, 1);
   parseInteger('DB_IDLE_TIMEOUT_MS', 30000, 1);
   parseInteger('DB_CONNECTION_TIMEOUT_MS', 5000, 1);
+  parseInteger('JWT_ACCESS_TTL_SECONDS', 900, 60);
+  parseInteger('AUTH_RATE_LIMIT_LOGIN_WINDOW_MS', 60000, 1000);
+  parseInteger('AUTH_RATE_LIMIT_LOGIN_MAX', 10, 1);
 }
 
 validateEnvironment();
@@ -56,4 +65,14 @@ export const env = {
   dbPoolMax: parseInteger('DB_POOL_MAX', 10, 1),
   dbIdleTimeoutMs: parseInteger('DB_IDLE_TIMEOUT_MS', 30000, 1),
   dbConnectionTimeoutMs: parseInteger('DB_CONNECTION_TIMEOUT_MS', 5000, 1),
+  jwtIssuer: process.env.JWT_ISSUER || 'stockpro-api',
+  jwtAudience: process.env.JWT_AUDIENCE || 'stockpro-client',
+  jwtAccessSecret: readRequired('JWT_ACCESS_SECRET'),
+  jwtAccessTtlSeconds: parseInteger('JWT_ACCESS_TTL_SECONDS', 900, 60),
+  authRateLimitLoginWindowMs: parseInteger(
+    'AUTH_RATE_LIMIT_LOGIN_WINDOW_MS',
+    60000,
+    1000
+  ),
+  authRateLimitLoginMax: parseInteger('AUTH_RATE_LIMIT_LOGIN_MAX', 10, 1),
 };
