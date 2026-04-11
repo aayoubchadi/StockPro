@@ -40,7 +40,7 @@ Seeded platform master admin (development):
 2. Create the database if it does not already exist.
 3. Run schema and seed scripts.
 4. Configure backend environment variables.
-5. For existing databases, run migration scripts under `backend/db/migrations/`.
+5. Re-running `backend/db/schema.sql` is supported for existing databases.
 
 ### 1) Create and Initialize Database
 
@@ -49,9 +49,6 @@ From the repository root, run:
 ```powershell
 "C:\dev\PostGreSQL\bin\createdb.exe" -U postgres -h localhost -p 9100 stockpro_db
 "C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/schema.sql
-"C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/migrations/2026-04-09_user-model-finalization.sql
-"C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/migrations/2026-04-11_auth-session-tokens.sql
-"C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/migrations/2026-04-11_auth-audit-events.sql
 "C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/seed.sql
 ```
 
@@ -153,15 +150,13 @@ Verification checks:
 
 ## Auth Hardening Runbook
 
-1. Ensure auth migrations are applied:
-   - `backend/db/migrations/2026-04-11_auth-session-tokens.sql`
-   - `backend/db/migrations/2026-04-11_auth-audit-events.sql`
-2. Confirm `.env` includes:
+1. Confirm `.env` includes:
    - `JWT_ACCESS_SECRET`
    - `JWT_ACCESS_TTL_SECONDS`
    - `JWT_REFRESH_TTL_SECONDS`
    - `JWT_SESSION_MAX_LIFETIME_SECONDS`
    - auth rate-limit variables for login/register/refresh
+2. Run `backend/db/schema.sql` to initialize or update schema objects (idempotent).
 3. Verify login returns both `accessToken` and `refreshToken`.
 4. Verify refresh rotates token and old token reuse triggers `AUTH_REFRESH_REUSED`.
 5. Verify logout blacklists current access token and denies subsequent `/auth/me` requests using that token.
