@@ -50,6 +50,8 @@ From the repository root, run:
 "C:\dev\PostGreSQL\bin\createdb.exe" -U postgres -h localhost -p 9100 stockpro_db
 "C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/schema.sql
 "C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/migrations/2026-04-09_user-model-finalization.sql
+"C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/migrations/2026-04-11_auth-session-tokens.sql
+"C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/migrations/2026-04-11_auth-audit-events.sql
 "C:\dev\PostGreSQL\bin\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/seed.sql
 ```
 
@@ -89,6 +91,19 @@ Optional with defaults (must be integer >= 1 when provided):
 - `DB_POOL_MAX` (default `10`)
 - `DB_IDLE_TIMEOUT_MS` (default `30000`)
 - `DB_CONNECTION_TIMEOUT_MS` (default `5000`)
+- `JWT_ACCESS_TTL_SECONDS` (default `900`)
+- `JWT_REFRESH_TTL_SECONDS` (default `604800`)
+- `JWT_SESSION_MAX_LIFETIME_SECONDS` (default `2592000`)
+- `AUTH_RATE_LIMIT_LOGIN_WINDOW_MS` (default `60000`)
+- `AUTH_RATE_LIMIT_LOGIN_MAX` (default `10`)
+- `AUTH_RATE_LIMIT_REGISTER_WINDOW_MS` (default `60000`)
+- `AUTH_RATE_LIMIT_REGISTER_MAX` (default `5`)
+- `AUTH_RATE_LIMIT_REFRESH_WINDOW_MS` (default `60000`)
+- `AUTH_RATE_LIMIT_REFRESH_MAX` (default `20`)
+
+Required:
+
+- `JWT_ACCESS_SECRET`: non-empty JWT signing secret
 
 If startup fails with env validation errors, check `backend/.env` first.
 
@@ -106,6 +121,11 @@ Then request `GET /health`. The response includes database status when connectio
 
 - `GET /` returns a simple API status payload.
 - `GET /health` returns uptime, timestamp, and PostgreSQL connectivity status.
+- `POST /api/v1/auth/register` creates tenant user with password policy enforcement.
+- `POST /api/v1/auth/login` returns access + refresh tokens.
+- `POST /api/v1/auth/refresh` rotates refresh token and returns new token pair.
+- `POST /api/v1/auth/logout` revokes access token and optional refresh session.
+- `GET /api/v1/auth/me` verifies bearer access token and returns auth claims.
 
 ## Stable Dev Runbook
 
@@ -130,3 +150,19 @@ Verification checks:
 - Local startup succeeds with the current configuration.
 - Blank `DB_PASSWORD` fails during startup.
 - Non-numeric `DB_PORT` fails during startup.
+
+## Auth Hardening Runbook
+
+1. Ensure auth migrations are applied:
+   - `backend/db/migrations/2026-04-11_auth-session-tokens.sql`
+   - `backend/db/migrations/2026-04-11_auth-audit-events.sql`
+2. Confirm `.env` includes:
+   - `JWT_ACCESS_SECRET`
+   - `JWT_ACCESS_TTL_SECONDS`
+   - `JWT_REFRESH_TTL_SECONDS`
+   - `JWT_SESSION_MAX_LIFETIME_SECONDS`
+   - auth rate-limit variables for login/register/refresh
+3. Verify login returns both `accessToken` and `refreshToken`.
+4. Verify refresh rotates token and old token reuse triggers `AUTH_REFRESH_REUSED`.
+5. Verify logout blacklists current access token and denies subsequent `/auth/me` requests using that token.
+6. Verify `auth_audit_events` receives records for `register`, `login`, `refresh`, and `logout` outcomes.

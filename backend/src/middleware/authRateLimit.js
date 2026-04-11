@@ -14,3 +14,31 @@ export const loginRateLimiter = rateLimit({
     },
   },
 });
+
+export const registerRateLimiter = rateLimit({
+  windowMs: env.authRateLimitRegisterWindowMs,
+  max: env.authRateLimitRegisterMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: {
+      code: 'AUTH_RATE_LIMITED',
+      message: 'Too many register attempts. Please try again later.',
+      details: [],
+    },
+  },
+});
+
+export const refreshRateLimiter = rateLimit({
+  windowMs: env.authRateLimitRefreshWindowMs,
+  max: env.authRateLimitRefreshMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: {
+      code: 'AUTH_RATE_LIMITED',
+      message: 'Too many refresh attempts. Please try again later.',
+      details: [],
+    },
+  },
+});

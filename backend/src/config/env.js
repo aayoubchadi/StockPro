@@ -53,6 +53,10 @@ export function validateEnvironment() {
   parseInteger('JWT_SESSION_MAX_LIFETIME_SECONDS', 2592000, 60);
   parseInteger('AUTH_RATE_LIMIT_LOGIN_WINDOW_MS', 60000, 1000);
   parseInteger('AUTH_RATE_LIMIT_LOGIN_MAX', 10, 1);
+  parseInteger('AUTH_RATE_LIMIT_REGISTER_WINDOW_MS', 60000, 1000);
+  parseInteger('AUTH_RATE_LIMIT_REGISTER_MAX', 5, 1);
+  parseInteger('AUTH_RATE_LIMIT_REFRESH_WINDOW_MS', 60000, 1000);
+  parseInteger('AUTH_RATE_LIMIT_REFRESH_MAX', 20, 1);
 }
 
 validateEnvironment();
@@ -83,4 +87,16 @@ export const env = {
     1000
   ),
   authRateLimitLoginMax: parseInteger('AUTH_RATE_LIMIT_LOGIN_MAX', 10, 1),
+  authRateLimitRegisterWindowMs: parseInteger(
+    'AUTH_RATE_LIMIT_REGISTER_WINDOW_MS',
+    60000,
+    1000
+  ),
+  authRateLimitRegisterMax: parseInteger('AUTH_RATE_LIMIT_REGISTER_MAX', 5, 1),
+  authRateLimitRefreshWindowMs: parseInteger(
+    'AUTH_RATE_LIMIT_REFRESH_WINDOW_MS',
+    60000,
+    1000
+  ),
+  authRateLimitRefreshMax: parseInteger('AUTH_RATE_LIMIT_REFRESH_MAX', 20, 1),
 };

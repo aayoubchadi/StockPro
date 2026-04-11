@@ -1,9 +1,13 @@
 import bcrypt from 'bcryptjs';
 import { Router } from 'express';
-import { query } from '../lib/db.js';
+import { query, withDbClient } from '../lib/db.js';
 import { signAccessToken } from '../lib/authJwt.js';
 import { HttpError } from '../lib/httpError.js';
-import { loginRateLimiter } from '../middleware/authRateLimit.js';
+import {
+  loginRateLimiter,
+  refreshRateLimiter,
+  registerRateLimiter,
+} from '../middleware/authRateLimit.js';
 import { env } from '../config/env.js';
 import { validatePasswordPolicy } from '../lib/passwordPolicy.js';
 import { requireAuth } from '../middleware/requireAuth.js';
@@ -17,6 +21,7 @@ import {
 } from '../lib/authSessionStore.js';
 import { generateRefreshToken, hashRefreshToken } from '../lib/refreshToken.js';
 import { blacklistAccessToken } from '../lib/accessTokenBlacklist.js';
+import { logAuthEvent } from '../lib/authAudit.js';
 
 const router = Router();
 
@@ -98,7 +103,26 @@ async function issueSessionTokens({
   };
 }
 
-router.post('/register', async (request, response, next) => {
+async function runWithCompanyScope(companyId, operation) {
+  return withDbClient(async (client) => {
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        "SELECT set_config('app.current_company_id', $1, true)",
+        [companyId]
+      );
+
+      const result = await operation(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    }
+  });
+}
+
+router.post('/register', registerRateLimiter, async (request, response, next) => {
   try {
     const companyId = normalizeValue(request.body.companyId);
     const fullName = normalizeValue(request.body.fullName);
@@ -152,11 +176,13 @@ router.post('/register', async (request, response, next) => {
     const passwordHash = await bcrypt.hash(password, 12);
 
     try {
-      const { rows } = await query(
-        `INSERT INTO users (company_id, full_name, email, password_hash, role)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, company_id, full_name, email::text AS email, role, is_active, created_at`,
-        [companyId, fullName, email, passwordHash, role]
+      const { rows } = await runWithCompanyScope(companyId, (client) =>
+        client.query(
+          `INSERT INTO users (company_id, full_name, email, password_hash, role)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id, company_id, full_name, email::text AS email, role, is_active, created_at`,
+          [companyId, fullName, email, passwordHash, role]
+        )
       );
 
       const user = rows[0];
@@ -172,6 +198,20 @@ router.post('/register', async (request, response, next) => {
             isActive: user.is_active,
             createdAt: user.created_at,
           },
+        },
+      });
+
+      await logAuthEvent({
+        eventType: 'register',
+        principalId: user.id,
+        scope: 'tenant',
+        companyId: user.company_id,
+        email: user.email,
+        success: true,
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'] || null,
+        metadata: {
+          role: user.role,
         },
       });
     } catch (dbError) {
@@ -215,6 +255,17 @@ router.post('/register', async (request, response, next) => {
       throw dbError;
     }
   } catch (error) {
+    await logAuthEvent({
+      eventType: 'register',
+      scope: 'tenant',
+      companyId: normalizeValue(request.body.companyId) || null,
+      email: normalizeEmail(request.body.email) || null,
+      success: false,
+      failureCode: error?.code || 'INTERNAL_SERVER_ERROR',
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
+    });
+
     next(error);
   }
 });
@@ -225,7 +276,6 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
     const password = normalizeValue(request.body.password);
     const accountScope = normalizeValue(request.body.accountScope);
     const companyId = normalizeValue(request.body.companyId);
-    const companySlug = normalizeValue(request.body.companySlug).toLowerCase();
 
     if (!email || !password || !accountScope) {
       throw new HttpError(
@@ -244,11 +294,11 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
     }
 
     if (accountScope === 'tenant') {
-      if (!companyId && !companySlug) {
+      if (!companyId) {
         throw new HttpError(
           400,
           'AUTH_VALIDATION_ERROR',
-          'tenant login requires companyId or companySlug'
+          'tenant login requires companyId'
         );
       }
 
@@ -260,38 +310,25 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
         );
       }
 
-      const params = [email];
-      let paramIndex = 2;
-
-      let tenantLoginQuery = `
-        SELECT
-          u.id,
-          u.company_id,
-          c.slug AS company_slug,
-          u.full_name,
-          u.email::text AS email,
-          u.password_hash,
-          u.role,
-          u.is_active
-        FROM users u
-        JOIN companies c ON c.id = u.company_id
-        WHERE u.email = $1
-      `;
-
-      if (companyId) {
-        tenantLoginQuery += ` AND u.company_id = $${paramIndex}`;
-        params.push(companyId);
-        paramIndex += 1;
-      }
-
-      if (companySlug) {
-        tenantLoginQuery += ` AND c.slug = $${paramIndex}`;
-        params.push(companySlug);
-      }
-
-      tenantLoginQuery += ' LIMIT 2';
-
-      const { rows } = await query(tenantLoginQuery, params);
+      const { rows } = await runWithCompanyScope(companyId, (client) =>
+        client.query(
+          `SELECT
+             u.id,
+             u.company_id,
+             c.slug AS company_slug,
+             u.full_name,
+             u.email::text AS email,
+             u.password_hash,
+             u.role,
+             u.is_active
+           FROM users u
+           JOIN companies c ON c.id = u.company_id
+           WHERE u.email = $1
+             AND u.company_id = $2
+           LIMIT 2`,
+          [email, companyId]
+        )
+      );
 
       if (rows.length !== 1) {
         throw new HttpError(
@@ -344,6 +381,17 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
             scope: 'tenant',
           },
         },
+      });
+
+      await logAuthEvent({
+        eventType: 'login',
+        principalId: user.id,
+        scope: 'tenant',
+        companyId: user.company_id,
+        email: user.email,
+        success: true,
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'] || null,
       });
 
       return;
@@ -408,12 +456,33 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
         },
       },
     });
+
+    await logAuthEvent({
+      eventType: 'login',
+      principalId: admin.id,
+      scope: 'platform',
+      email: admin.email,
+      success: true,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
+    });
   } catch (error) {
+    await logAuthEvent({
+      eventType: 'login',
+      scope: normalizeValue(request.body.accountScope) || null,
+      companyId: normalizeValue(request.body.companyId) || null,
+      email: normalizeEmail(request.body.email) || null,
+      success: false,
+      failureCode: error?.code || 'INTERNAL_SERVER_ERROR',
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
+    });
+
     next(error);
   }
 });
 
-router.post('/refresh', async (request, response, next) => {
+router.post('/refresh', refreshRateLimiter, async (request, response, next) => {
   try {
     const refreshToken = normalizeValue(request.body.refreshToken);
 
@@ -448,6 +517,19 @@ router.post('/refresh', async (request, response, next) => {
 
     if (existingToken.replaced_by_token_id) {
       await revokeSessionById(existingToken.session_id);
+
+      await logAuthEvent({
+        eventType: 'refresh_reuse_detected',
+        principalId: existingToken.principal_id,
+        scope: existingToken.scope,
+        companyId: existingToken.company_id,
+        email: existingToken.email,
+        success: false,
+        failureCode: 'AUTH_REFRESH_REUSED',
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'] || null,
+      });
+
       throw new HttpError(401, 'AUTH_REFRESH_REUSED', 'Refresh token reuse detected');
     }
 
@@ -492,7 +574,26 @@ router.post('/refresh', async (request, response, next) => {
         refreshExpiresIn: env.jwtRefreshTtlSeconds,
       },
     });
+
+    await logAuthEvent({
+      eventType: 'refresh',
+      principalId: existingToken.principal_id,
+      scope: existingToken.scope,
+      companyId: existingToken.company_id,
+      email: existingToken.email,
+      success: true,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
+    });
   } catch (error) {
+    await logAuthEvent({
+      eventType: 'refresh',
+      success: false,
+      failureCode: error?.code || 'INTERNAL_SERVER_ERROR',
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
+    });
+
     next(error);
   }
 });
@@ -524,8 +625,31 @@ router.post('/logout', requireAuth, async (request, response, next) => {
       }
     }
 
+    await logAuthEvent({
+      eventType: 'logout',
+      principalId: request.auth.userId,
+      scope: request.auth.scope,
+      companyId: request.auth.companyId,
+      email: request.auth.email,
+      success: true,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
+    });
+
     response.status(204).send();
   } catch (error) {
+    await logAuthEvent({
+      eventType: 'logout',
+      principalId: request.auth?.userId || null,
+      scope: request.auth?.scope || null,
+      companyId: request.auth?.companyId || null,
+      email: request.auth?.email || null,
+      success: false,
+      failureCode: error?.code || 'INTERNAL_SERVER_ERROR',
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
+    });
+
     next(error);
   }
 });

@@ -14,6 +14,16 @@ const pool = new Pool({
 
 export const query = (text, params) => pool.query(text, params);
 
+export async function withDbClient(handler) {
+  const client = await pool.connect();
+
+  try {
+    return await handler(client);
+  } finally {
+    client.release();
+  }
+}
+
 export async function checkDatabaseConnection() {
   const { rows } = await pool.query(
     'SELECT current_database(), current_user, NOW() AS database_time'
