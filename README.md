@@ -1,11 +1,11 @@
-# Stage-FE
+# StockPro
 
 Repository layout for the stock management project.
 
 ## Structure
 
 ```
-Stage-FE/
+StockPro/
 ├── package.json  # Root workspace scripts
 ├── frontend/   # React + Vite application
 ├── backend/    # API and server-side code
