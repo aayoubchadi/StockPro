@@ -2,48 +2,69 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Header from '../components/Header';
 import PageBackground from '../components/PageBackground';
-import { getAccounts, saveSession, getDashboardPathForRole, ensureSeedAccount } from '../lib/authStore';
+import {
+  getDashboardPathForRole,
+  saveSession,
+} from '../lib/authStore';
+import { loginRequest } from '../services/authApi';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   useEffect(() => {
-    ensureSeedAccount();
     const emailParam = searchParams.get('email');
     if (emailParam) {
       setEmail(emailParam);
     }
   }, [searchParams]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const emailLower = email.trim().toLowerCase();
-    const accounts = getAccounts();
 
-    if (!accounts[emailLower] || accounts[emailLower].password !== password) {
-      setMessage('Identifiants invalides.');
+    const normalizedEmail = email.trim().toLowerCase();
+    setIsSubmitting(true);
+    setMessage('');
+    setMessageType('');
+
+    try {
+      const data = await loginRequest({
+        email: normalizedEmail,
+        password,
+      });
+
+      saveSession({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        tokenType: data.tokenType,
+        expiresIn: data.expiresIn,
+        refreshExpiresIn: data.refreshExpiresIn,
+        user: data.user,
+        email: data.user?.email || normalizedEmail,
+        fullName: data.user?.fullName || 'Utilisateur',
+        role: data.user?.role || 'employee',
+        scope: data.user?.scope || 'tenant',
+        companyId: data.user?.companyId || null,
+      });
+
+      const role = data.user?.role || 'employee';
+
+      setMessage('Connexion reussie. Redirection...');
+      setMessageType('success');
+      setTimeout(() => {
+        navigate(getDashboardPathForRole(role));
+      }, 700);
+    } catch (error) {
+      setMessage(error.message || 'Identifiants invalides.');
       setMessageType('error');
-      return;
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const account = accounts[emailLower];
-    const role = account.role || 'client';
-    saveSession({
-      email: emailLower,
-      fullName: account.fullName || 'Utilisateur',
-      role,
-    });
-
-    setMessage('Connexion reussie. Redirection...');
-    setMessageType('success');
-    setTimeout(() => {
-      navigate(getDashboardPathForRole(role));
-    }, 900);
   };
 
   return (
@@ -55,8 +76,6 @@ export default function LoginPage() {
           <p className="eyebrow">Connexion</p>
           <h1>Bienvenue sur StockPro</h1>
           <p>Connectez-vous pour piloter vos stocks, commandes et fournisseurs.</p>
-          <p className="auth-hint">Test client: client@stockpro.com / client1234</p>
-          <p className="auth-hint">Test admin: admin@stockpro.com / admin1234</p>
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <label>
@@ -81,7 +100,9 @@ export default function LoginPage() {
               />
             </label>
 
-            <button type="submit" className="btn btn-primary">Se connecter</button>
+            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+              {isSubmitting ? 'Connexion...' : 'Se connecter'}
+            </button>
           </form>
 
           <p className={`form-message ${messageType}`} aria-live="polite">

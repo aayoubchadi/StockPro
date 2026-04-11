@@ -1,14 +1,22 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getSession, clearSession } from '../lib/authStore';
+import { logoutRequest } from '../services/authApi';
 
 export default function Header({ showNav = true, isDashboard = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const session = getSession();
 
-  const handleLogout = () => {
-    clearSession();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await logoutRequest({
+        accessToken: session?.accessToken,
+        refreshToken: session?.refreshToken,
+      });
+    } finally {
+      clearSession();
+      navigate('/login');
+    }
   };
 
   return (

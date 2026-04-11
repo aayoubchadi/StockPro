@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'stockpro_accounts';
 const SESSION_KEY = 'stockpro_session';
+const AUTH_PREFS_KEY = 'stockpro_auth_prefs';
 
 export const getAccounts = () => {
   try {
@@ -32,8 +33,46 @@ export const clearSession = () => {
   localStorage.removeItem(SESSION_KEY);
 };
 
+export const getAuthPrefs = () => {
+  try {
+    const raw = localStorage.getItem(AUTH_PREFS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+
+    if (!parsed || typeof parsed !== 'object') {
+      return {
+        accountScope: 'tenant',
+        companyId: '',
+      };
+    }
+
+    return {
+      accountScope:
+        parsed.accountScope === 'platform' ? 'platform' : 'tenant',
+      companyId: typeof parsed.companyId === 'string' ? parsed.companyId : '',
+    };
+  } catch {
+    return {
+      accountScope: 'tenant',
+      companyId: '',
+    };
+  }
+};
+
+export const saveAuthPrefs = ({ accountScope, companyId }) => {
+  localStorage.setItem(
+    AUTH_PREFS_KEY,
+    JSON.stringify({
+      accountScope: accountScope === 'platform' ? 'platform' : 'tenant',
+      companyId: String(companyId || ''),
+    })
+  );
+};
+
+export const isAdminRole = (role) =>
+  role === 'admin' || role === 'company_admin' || role === 'platform_admin';
+
 export const getDashboardPathForRole = (role) => {
-  return role === 'admin' ? '/admin-dashboard' : '/client-dashboard';
+  return isAdminRole(role) ? '/admin-dashboard' : '/client-dashboard';
 };
 
 export const ensureSeedAccount = () => {

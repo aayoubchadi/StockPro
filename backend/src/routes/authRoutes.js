@@ -122,6 +122,31 @@ async function runWithCompanyScope(companyId, operation) {
   });
 }
 
+async function findTenantUsersByEmail(email) {
+  return withDbClient(async (client) => {
+    try {
+      await client.query('BEGIN');
+      await client.query("SELECT set_config('app.auth_mode', 'login', true)");
+      await client.query("SELECT set_config('app.auth_email', $1, true)", [email]);
+
+      const result = await client.query(
+        `SELECT id, company_id, full_name, email::text AS email, password_hash, role, is_active
+         FROM users
+         WHERE email = $1
+         ORDER BY created_at ASC
+         LIMIT 2`,
+        [email]
+      );
+
+      await client.query('COMMIT');
+      return result.rows;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    }
+  });
+}
+
 router.post('/register', registerRateLimiter, async (request, response, next) => {
   try {
     const companyId = normalizeValue(request.body.companyId);
@@ -277,15 +302,15 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
     const accountScope = normalizeValue(request.body.accountScope);
     const companyId = normalizeValue(request.body.companyId);
 
-    if (!email || !password || !accountScope) {
+    if (!email || !password) {
       throw new HttpError(
         400,
         'AUTH_VALIDATION_ERROR',
-        'email, password, and accountScope are required'
+        'email and password are required'
       );
     }
 
-    if (accountScope !== 'tenant' && accountScope !== 'platform') {
+    if (accountScope && accountScope !== 'tenant' && accountScope !== 'platform') {
       throw new HttpError(
         400,
         'AUTH_VALIDATION_ERROR',
@@ -293,16 +318,108 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
       );
     }
 
-    if (accountScope === 'tenant') {
-      if (!companyId) {
-        throw new HttpError(
-          400,
-          'AUTH_VALIDATION_ERROR',
-          'tenant login requires companyId'
-        );
+    if (!accountScope || accountScope === 'platform') {
+      const { rows: platformRows } = await query(
+        `SELECT id, full_name, email::text AS email, password_hash, is_active
+         FROM platform_admins
+         WHERE email = $1
+         LIMIT 1`,
+        [email]
+      );
+
+      if (platformRows.length === 1) {
+        const admin = platformRows[0];
+
+        if (!admin.is_active) {
+          throw new HttpError(403, 'AUTH_ACCOUNT_DISABLED', 'Account is disabled');
+        }
+
+        const matches = await bcrypt.compare(password, admin.password_hash);
+
+        if (!matches) {
+          throw new HttpError(
+            401,
+            'AUTH_INVALID_CREDENTIALS',
+            'Invalid email or password'
+          );
+        }
+
+        const tokens = await issueSessionTokens({
+          principalId: admin.id,
+          scope: 'platform',
+          role: 'platform_admin',
+          companyId: null,
+          email: admin.email,
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent'] || null,
+        });
+
+        response.json({
+          data: {
+            accessToken: tokens.accessToken,
+            tokenType: 'Bearer',
+            expiresIn: env.jwtAccessTtlSeconds,
+            refreshToken: tokens.refreshToken,
+            refreshExpiresIn: env.jwtRefreshTtlSeconds,
+            user: {
+              id: admin.id,
+              companyId: null,
+              fullName: admin.full_name,
+              email: admin.email,
+              role: 'platform_admin',
+              scope: 'platform',
+            },
+          },
+        });
+
+        await logAuthEvent({
+          eventType: 'login',
+          principalId: admin.id,
+          scope: 'platform',
+          email: admin.email,
+          success: true,
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent'] || null,
+        });
+
+        return;
       }
 
-      if (companyId && !isUuid(companyId)) {
+      if (accountScope === 'platform') {
+        throw new HttpError(
+          401,
+          'AUTH_INVALID_CREDENTIALS',
+          'Invalid email or password'
+        );
+      }
+    }
+
+    if (!accountScope || accountScope === 'tenant') {
+      let resolvedCompanyId = companyId;
+
+      if (!resolvedCompanyId) {
+        const matchingUsers = await findTenantUsersByEmail(email);
+
+        if (matchingUsers.length > 1) {
+          throw new HttpError(
+            409,
+            'AUTH_VALIDATION_ERROR',
+            'Multiple tenant accounts found for this email. Please contact support.'
+          );
+        }
+
+        if (matchingUsers.length !== 1) {
+          throw new HttpError(
+            401,
+            'AUTH_INVALID_CREDENTIALS',
+            'Invalid email or password'
+          );
+        }
+
+        resolvedCompanyId = matchingUsers[0].company_id;
+      }
+
+      if (!isUuid(resolvedCompanyId)) {
         throw new HttpError(
           400,
           'AUTH_VALIDATION_ERROR',
@@ -310,7 +427,7 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
         );
       }
 
-      const { rows } = await runWithCompanyScope(companyId, (client) =>
+      const { rows } = await runWithCompanyScope(resolvedCompanyId, (client) =>
         client.query(
           `SELECT
              u.id,
@@ -326,7 +443,7 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
            WHERE u.email = $1
              AND u.company_id = $2
            LIMIT 2`,
-          [email, companyId]
+          [email, resolvedCompanyId]
         )
       );
 
@@ -397,75 +514,7 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
       return;
     }
 
-    const { rows } = await query(
-      `SELECT id, full_name, email::text AS email, password_hash, is_active
-       FROM platform_admins
-       WHERE email = $1
-       LIMIT 1`,
-      [email]
-    );
-
-    if (rows.length !== 1) {
-      throw new HttpError(
-        401,
-        'AUTH_INVALID_CREDENTIALS',
-        'Invalid email or password'
-      );
-    }
-
-    const admin = rows[0];
-
-    if (!admin.is_active) {
-      throw new HttpError(403, 'AUTH_ACCOUNT_DISABLED', 'Account is disabled');
-    }
-
-    const matches = await bcrypt.compare(password, admin.password_hash);
-
-    if (!matches) {
-      throw new HttpError(
-        401,
-        'AUTH_INVALID_CREDENTIALS',
-        'Invalid email or password'
-      );
-    }
-
-    const tokens = await issueSessionTokens({
-      principalId: admin.id,
-      scope: 'platform',
-      role: 'platform_admin',
-      companyId: null,
-      email: admin.email,
-      ipAddress: request.ip,
-      userAgent: request.headers['user-agent'] || null,
-    });
-
-    response.json({
-      data: {
-        accessToken: tokens.accessToken,
-        tokenType: 'Bearer',
-        expiresIn: env.jwtAccessTtlSeconds,
-        refreshToken: tokens.refreshToken,
-        refreshExpiresIn: env.jwtRefreshTtlSeconds,
-        user: {
-          id: admin.id,
-          companyId: null,
-          fullName: admin.full_name,
-          email: admin.email,
-          role: 'platform_admin',
-          scope: 'platform',
-        },
-      },
-    });
-
-    await logAuthEvent({
-      eventType: 'login',
-      principalId: admin.id,
-      scope: 'platform',
-      email: admin.email,
-      success: true,
-      ipAddress: request.ip,
-      userAgent: request.headers['user-agent'] || null,
-    });
+    throw new HttpError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid email or password');
   } catch (error) {
     await logAuthEvent({
       eventType: 'login',

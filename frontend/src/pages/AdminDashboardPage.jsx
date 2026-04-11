@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import PageBackground from '../components/PageBackground';
-import { getSession } from '../lib/authStore';
+import { getSession, isAdminRole } from '../lib/authStore';
 
 export default function AdminDashboardPage() {
   const [userName, setUserName] = useState('Admin');
@@ -17,8 +17,8 @@ export default function AdminDashboardPage() {
       return;
     }
 
-    if (session.role !== 'admin') {
-      navigate(session.role === 'client' ? '/client-dashboard' : '/login');
+    if (!isAdminRole(session.role)) {
+      navigate('/client-dashboard');
       return;
     }
 
