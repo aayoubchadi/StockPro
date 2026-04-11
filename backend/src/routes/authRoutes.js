@@ -6,6 +6,7 @@ import { HttpError } from '../lib/httpError.js';
 import { loginRateLimiter } from '../middleware/authRateLimit.js';
 import { env } from '../config/env.js';
 import { validatePasswordPolicy } from '../lib/passwordPolicy.js';
+import { requireAuth } from '../middleware/requireAuth.js';
 
 const router = Router();
 
@@ -317,7 +318,7 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
       data: {
         accessToken,
         tokenType: 'Bearer',
-          expiresIn: env.jwtAccessTtlSeconds,
+        expiresIn: env.jwtAccessTtlSeconds,
         user: {
           id: admin.id,
           companyId: null,
@@ -325,6 +326,25 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
           email: admin.email,
           role: 'platform_admin',
           scope: 'platform',
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/me', requireAuth, async (request, response, next) => {
+  try {
+    response.json({
+      data: {
+        auth: {
+          userId: request.auth.userId,
+          tokenId: request.auth.tokenId,
+          scope: request.auth.scope,
+          role: request.auth.role,
+          companyId: request.auth.companyId,
+          email: request.auth.email,
         },
       },
     });
