@@ -4,6 +4,7 @@ import { query } from '../lib/db.js';
 import { signAccessToken } from '../lib/authJwt.js';
 import { HttpError } from '../lib/httpError.js';
 import { loginRateLimiter } from '../middleware/authRateLimit.js';
+import { env } from '../config/env.js';
 
 const router = Router();
 
@@ -11,11 +12,23 @@ function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function normalizeValue(value) {
+  return String(value || '').trim();
+}
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
+}
+
 router.post('/login', loginRateLimiter, async (request, response, next) => {
   try {
     const email = normalizeEmail(request.body.email);
-    const password = String(request.body.password || '');
-    const accountScope = String(request.body.accountScope || '').trim();
+    const password = normalizeValue(request.body.password);
+    const accountScope = normalizeValue(request.body.accountScope);
+    const companyId = normalizeValue(request.body.companyId);
+    const companySlug = normalizeValue(request.body.companySlug).toLowerCase();
 
     if (!email || !password || !accountScope) {
       throw new HttpError(
@@ -34,14 +47,54 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
     }
 
     if (accountScope === 'tenant') {
-      const { rows } = await query(
-        `SELECT id, company_id, full_name, email::text AS email, password_hash, role, is_active
-         FROM users
-         WHERE email = $1
-         ORDER BY created_at ASC
-         LIMIT 2`,
-        [email]
-      );
+      if (!companyId && !companySlug) {
+        throw new HttpError(
+          400,
+          'AUTH_VALIDATION_ERROR',
+          'tenant login requires companyId or companySlug'
+        );
+      }
+
+      if (companyId && !isUuid(companyId)) {
+        throw new HttpError(
+          400,
+          'AUTH_VALIDATION_ERROR',
+          'companyId must be a valid UUID'
+        );
+      }
+
+      const params = [email];
+      let paramIndex = 2;
+
+      let tenantLoginQuery = `
+        SELECT
+          u.id,
+          u.company_id,
+          c.slug AS company_slug,
+          u.full_name,
+          u.email::text AS email,
+          u.password_hash,
+          u.role,
+          u.is_active
+        FROM users u
+        JOIN companies c ON c.id = u.company_id
+        WHERE u.email = $1
+      `;
+
+      if (companyId) {
+        tenantLoginQuery += ` AND u.company_id = $${paramIndex}`;
+        params.push(companyId);
+        paramIndex += 1;
+      }
+
+      if (companySlug) {
+        tenantLoginQuery += ` AND c.slug = $${paramIndex}`;
+        params.push(companySlug);
+      }
+
+      tenantLoginQuery += ' LIMIT 2';
+
+      const { rows } = await query(tenantLoginQuery, params);
 
       if (rows.length !== 1) {
         throw new HttpError(
@@ -79,10 +132,11 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
         data: {
           accessToken,
           tokenType: 'Bearer',
-          expiresIn: 900,
+          expiresIn: env.jwtAccessTtlSeconds,
           user: {
             id: user.id,
             companyId: user.company_id,
+            companySlug: user.company_slug,
             fullName: user.full_name,
             email: user.email,
             role: user.role,
@@ -137,7 +191,7 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
       data: {
         accessToken,
         tokenType: 'Bearer',
-        expiresIn: 900,
+          expiresIn: env.jwtAccessTtlSeconds,
         user: {
           id: admin.id,
           companyId: null,
