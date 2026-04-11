@@ -346,3 +346,57 @@ Failure cases:
 - Hash refresh tokens at rest (never store plaintext refresh token).
 - Apply auth rate limiting per IP and per email.
 - Record audit events for `register`, `login`, `refresh`, `logout`, and refresh-reuse detection.
+
+## 15. Implementation checklist (backend)
+
+Required DB artifacts:
+- `auth_sessions` table
+- `auth_refresh_tokens` table
+- `auth_access_token_blacklist` table (if Redis is not used)
+
+Required indexes:
+- `auth_refresh_tokens(token_hash)` unique
+- `auth_refresh_tokens(session_id)`
+- `auth_refresh_tokens(expires_at)`
+- `auth_access_token_blacklist(jti)` unique
+- `auth_access_token_blacklist(expires_at)`
+
+Required env contract additions:
+- `JWT_ISSUER=stockpro-api`
+- `JWT_AUDIENCE=stockpro-client`
+- `JWT_ACCESS_TTL_SECONDS=900`
+- `JWT_REFRESH_TTL_SECONDS=604800`
+- `JWT_SESSION_MAX_LIFETIME_SECONDS=2592000`
+- `JWT_ACTIVE_KID=<current-signing-key-id>`
+- `JWT_PRIVATE_KEY_PEM=<multi-line-or-base64-pem>`
+- `JWT_PUBLIC_KEYS_JWKS_JSON=<jwks-json-or-path>`
+- `AUTH_BCRYPT_COST=12`
+
+Recommended env contract additions:
+- `AUTH_RATE_LIMIT_LOGIN_PER_MINUTE=10`
+- `AUTH_RATE_LIMIT_REFRESH_PER_MINUTE=20`
+- `AUTH_REDIS_URL=<redis-connection-string>` (optional)
+
+Verification checklist:
+- Register user with valid payload returns `201`.
+- Register user with weak password returns `400 AUTH_VALIDATION_ERROR`.
+- Login success returns access + refresh tokens.
+- Login with invalid password returns `401 AUTH_INVALID_CREDENTIALS`.
+- Refresh with valid token returns a new rotated refresh token.
+- Reusing an old refresh token returns `401 AUTH_REFRESH_REUSED`.
+- Logout invalidates current access token `jti` and optional refresh token.
+
+## 16. Decision summary (frozen for Day 3)
+
+| Topic | Decision |
+|---|---|
+| Access token format | JWT (`RS256`) |
+| Refresh token format | Opaque random token, hashed at rest |
+| Access token TTL | 15 minutes |
+| Refresh token TTL | 7 days |
+| Absolute session lifetime | 30 days |
+| Refresh strategy | Rotation per use + reuse detection |
+| Key rotation cadence | 90 days planned |
+| Revocation strategy | Access `jti` blacklist + refresh token chain state |
+| Password minimum length | 12 |
+| Password complexity | upper + lower + digit + special |
