@@ -5,6 +5,7 @@ import { signAccessToken } from '../lib/authJwt.js';
 import { HttpError } from '../lib/httpError.js';
 import { loginRateLimiter } from '../middleware/authRateLimit.js';
 import { env } from '../config/env.js';
+import { validatePasswordPolicy } from '../lib/passwordPolicy.js';
 
 const router = Router();
 
@@ -21,6 +22,131 @@ function isUuid(value) {
     value
   );
 }
+
+function normalizeRole(value) {
+  return String(value || 'employee').trim();
+}
+
+router.post('/register', async (request, response, next) => {
+  try {
+    const companyId = normalizeValue(request.body.companyId);
+    const fullName = normalizeValue(request.body.fullName);
+    const email = normalizeEmail(request.body.email);
+    const password = normalizeValue(request.body.password);
+    const role = normalizeRole(request.body.role);
+
+    if (!companyId || !fullName || !email || !password) {
+      throw new HttpError(
+        400,
+        'AUTH_VALIDATION_ERROR',
+        'companyId, fullName, email, and password are required'
+      );
+    }
+
+    if (!isUuid(companyId)) {
+      throw new HttpError(
+        400,
+        'AUTH_VALIDATION_ERROR',
+        'companyId must be a valid UUID'
+      );
+    }
+
+    if (fullName.length < 2 || fullName.length > 120) {
+      throw new HttpError(
+        400,
+        'AUTH_VALIDATION_ERROR',
+        'fullName must be between 2 and 120 characters'
+      );
+    }
+
+    if (role !== 'employee' && role !== 'company_admin') {
+      throw new HttpError(
+        400,
+        'AUTH_VALIDATION_ERROR',
+        'role must be either employee or company_admin'
+      );
+    }
+
+    const passwordValidation = validatePasswordPolicy(password, email);
+
+    if (!passwordValidation.isValid) {
+      throw new HttpError(
+        400,
+        'AUTH_VALIDATION_ERROR',
+        'Password does not meet security policy',
+        passwordValidation.errors
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    try {
+      const { rows } = await query(
+        `INSERT INTO users (company_id, full_name, email, password_hash, role)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, company_id, full_name, email::text AS email, role, is_active, created_at`,
+        [companyId, fullName, email, passwordHash, role]
+      );
+
+      const user = rows[0];
+
+      response.status(201).json({
+        data: {
+          user: {
+            id: user.id,
+            companyId: user.company_id,
+            fullName: user.full_name,
+            email: user.email,
+            role: user.role,
+            isActive: user.is_active,
+            createdAt: user.created_at,
+          },
+        },
+      });
+    } catch (dbError) {
+      if (dbError?.code === '23505') {
+        if (dbError.constraint === 'uq_users_company_email') {
+          throw new HttpError(
+            409,
+            'AUTH_VALIDATION_ERROR',
+            'A user with this email already exists in the company'
+          );
+        }
+
+        if (dbError.constraint === 'uq_users_one_active_admin_per_company') {
+          throw new HttpError(
+            409,
+            'AUTH_VALIDATION_ERROR',
+            'This company already has an active company admin'
+          );
+        }
+      }
+
+      if (dbError?.code === '23503') {
+        throw new HttpError(
+          400,
+          'AUTH_VALIDATION_ERROR',
+          'Invalid companyId: company does not exist'
+        );
+      }
+
+      if (
+        dbError?.code === 'P0001' &&
+        String(dbError.message || '').includes('Employee limit exceeded')
+      ) {
+        throw new HttpError(
+          409,
+          'AUTH_VALIDATION_ERROR',
+          'Employee limit exceeded for the company subscription plan'
+        );
+      }
+
+      throw dbError;
+    }
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.post('/login', loginRateLimiter, async (request, response, next) => {
   try {
