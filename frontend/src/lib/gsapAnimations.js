@@ -96,6 +96,12 @@ const staggerCards = () => {
 
 const animateDashboardBars = () => {
   const bars = document.querySelectorAll(selectors.bars);
+  const dashboardCard = document.querySelector(selectors.dashboardCard);
+
+  if (!bars.length || !dashboardCard) {
+    return;
+  }
+
   gsap.set(bars, { height: 8 });
 
   gsap.to(bars, {
@@ -123,6 +129,13 @@ const animateDashboardBars = () => {
 };
 
 const animateDashboardSidebar = () => {
+  const dashboardSidebar = document.querySelector(selectors.dashboardSidebar);
+  const dashboardCard = document.querySelector(selectors.dashboardCard);
+
+  if (!dashboardSidebar || !dashboardCard) {
+    return;
+  }
+
   gsap.from(selectors.dashboardSidebar, {
     x: -70,
     opacity: 0,
@@ -192,7 +205,7 @@ const magneticDashboardTilt = () => {
 export const initAnimations = () => {
   // Kill existing ScrollTriggers to avoid duplicates
   ScrollTrigger.getAll().forEach(trigger => trigger.kill());
-  
+
   heroIntro();
   setupParallax();
   revealSections();
@@ -202,7 +215,7 @@ export const initAnimations = () => {
   animateDashboardBars();
   animateCounters();
   magneticDashboardTilt();
-  
+
   // Refresh ScrollTrigger after all animations are set up
   ScrollTrigger.refresh();
 };

@@ -7,8 +7,10 @@ import {
   saveSession,
 } from '../lib/authStore';
 import { loginRequest } from '../services/authApi';
+import { useLanguage } from '../lib/i18n';
 
 export default function LoginPage() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
@@ -54,13 +56,13 @@ export default function LoginPage() {
 
       const role = data.user?.role || 'employee';
 
-      setMessage('Connexion reussie. Redirection...');
+      setMessage(t('auth.login.success'));
       setMessageType('success');
       setTimeout(() => {
         navigate(getDashboardPathForRole(role));
       }, 700);
     } catch (error) {
-      setMessage(error.message || 'Identifiants invalides.');
+      setMessage(error.message || t('auth.login.invalidCredentials'));
       setMessageType('error');
     } finally {
       setIsSubmitting(false);
@@ -73,35 +75,35 @@ export default function LoginPage() {
       <Header showNav={false} />
       <main className="section section-shell auth-main">
         <section className="auth-wrap">
-          <p className="eyebrow">Connexion</p>
-          <h1>Bienvenue sur StockPro</h1>
-          <p>Connectez-vous pour piloter vos stocks, commandes et fournisseurs.</p>
+          <p className="eyebrow">{t('auth.login.eyebrow')}</p>
+          <h1>{t('auth.login.title')}</h1>
+          <p>{t('auth.login.subtitle')}</p>
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <label>
-              Email
+              {t('auth.login.email')}
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nom@entreprise.com"
+                placeholder={t('auth.placeholders.email')}
                 required
               />
             </label>
 
             <label>
-              Mot de passe
+              {t('auth.login.password')}
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder={t('auth.placeholders.passwordDots')}
                 required
               />
             </label>
 
             <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Connexion...' : 'Se connecter'}
+              {isSubmitting ? t('auth.login.submitting') : t('auth.login.submit')}
             </button>
           </form>
 
@@ -110,8 +112,8 @@ export default function LoginPage() {
           </p>
 
           <div className="auth-links">
-            <a href="/forgot-password">Mot de passe oublie ?</a>
-            <a href="/create-account">Creer un compte</a>
+            <a href="/forgot-password">{t('auth.login.forgot')}</a>
+            <a href="/create-account">{t('auth.login.createAccount')}</a>
           </div>
         </section>
       </main>

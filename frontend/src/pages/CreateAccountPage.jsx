@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import PageBackground from '../components/PageBackground';
 import { getAccounts, saveAccounts, ensureSeedAccount } from '../lib/authStore';
+import { useLanguage } from '../lib/i18n';
 
 export default function CreateAccountPage() {
+  const { t } = useLanguage();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,29 +20,29 @@ export default function CreateAccountPage() {
     ensureSeedAccount();
 
     if (password.length < 6) {
-      setMessage('Le mot de passe doit contenir au moins 6 caracteres.');
+      setMessage(t('auth.createAccount.passwordMin'));
       setMessageType('error');
       return;
     }
 
     if (password !== confirmPassword) {
-      setMessage('Les mots de passe ne correspondent pas.');
+      setMessage(t('auth.createAccount.passwordMismatch'));
       setMessageType('error');
       return;
     }
 
     const accounts = getAccounts();
     const emailLower = email.trim().toLowerCase();
-    
+
     if (accounts[emailLower]) {
-      setMessage('Cet email existe deja.');
+      setMessage(t('auth.createAccount.emailExists'));
       setMessageType('error');
       return;
     }
 
     accounts[emailLower] = { fullName, password, role: 'client' };
     saveAccounts(accounts);
-    setMessage('Compte cree avec succes. Redirection...');
+    setMessage(t('auth.createAccount.success'));
     setMessageType('success');
     setTimeout(() => {
       navigate(`/login?email=${encodeURIComponent(emailLower)}`);
@@ -53,56 +55,56 @@ export default function CreateAccountPage() {
       <Header showNav={false} />
       <main className="section section-shell auth-main">
         <section className="auth-wrap">
-          <p className="eyebrow">Inscription</p>
-          <h1>Creer votre compte</h1>
-          <p>Commencez en quelques secondes.</p>
+          <p className="eyebrow">{t('auth.createAccount.eyebrow')}</p>
+          <h1>{t('auth.createAccount.title')}</h1>
+          <p>{t('auth.createAccount.subtitle')}</p>
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <label>
-              Nom complet
+              {t('auth.createAccount.fullName')}
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Votre nom"
+                placeholder={t('auth.placeholders.fullName')}
                 required
               />
             </label>
 
             <label>
-              Email
+              {t('auth.createAccount.email')}
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nom@entreprise.com"
+                placeholder={t('auth.placeholders.email')}
                 required
               />
             </label>
 
             <label>
-              Mot de passe
+              {t('auth.createAccount.password')}
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="6 caracteres minimum"
+                placeholder={t('auth.placeholders.passwordMin')}
                 required
               />
             </label>
 
             <label>
-              Confirmer mot de passe
+              {t('auth.createAccount.confirmPassword')}
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Retapez le mot de passe"
+                placeholder={t('auth.placeholders.retypePassword')}
                 required
               />
             </label>
 
-            <button type="submit" className="btn btn-primary">Creer mon compte</button>
+            <button type="submit" className="btn btn-primary">{t('auth.createAccount.submit')}</button>
           </form>
 
           <p className={`form-message ${messageType}`} aria-live="polite">
@@ -110,8 +112,8 @@ export default function CreateAccountPage() {
           </p>
 
           <div className="auth-links">
-            <a href="/login">J'ai deja un compte</a>
-            <a href="/forgot-password">Mot de passe oublie ?</a>
+            <a href="/login">{t('auth.createAccount.hasAccount')}</a>
+            <a href="/forgot-password">{t('auth.createAccount.forgot')}</a>
           </div>
         </section>
       </main>

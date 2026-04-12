@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import PageBackground from '../components/PageBackground';
 import { getAccounts, saveAccounts, ensureSeedAccount } from '../lib/authStore';
+import { useLanguage } from '../lib/i18n';
 
 export default function ForgotPasswordPage() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -17,29 +19,29 @@ export default function ForgotPasswordPage() {
     ensureSeedAccount();
 
     if (newPassword.length < 6) {
-      setMessage('Le mot de passe doit contenir au moins 6 caracteres.');
+      setMessage(t('auth.forgotPassword.passwordMin'));
       setMessageType('error');
       return;
     }
 
     if (newPassword !== confirmNewPassword) {
-      setMessage('Les mots de passe ne correspondent pas.');
+      setMessage(t('auth.forgotPassword.passwordMismatch'));
       setMessageType('error');
       return;
     }
 
     const accounts = getAccounts();
     const emailLower = email.trim().toLowerCase();
-    
+
     if (!accounts[emailLower]) {
-      setMessage('Aucun compte trouve avec cet email.');
+      setMessage(t('auth.forgotPassword.noAccount'));
       setMessageType('error');
       return;
     }
 
     accounts[emailLower].password = newPassword;
     saveAccounts(accounts);
-    setMessage('Mot de passe mis a jour. Redirection...');
+    setMessage(t('auth.forgotPassword.success'));
     setMessageType('success');
     setTimeout(() => {
       navigate(`/login?email=${encodeURIComponent(emailLower)}`);
@@ -52,45 +54,45 @@ export default function ForgotPasswordPage() {
       <Header showNav={false} />
       <main className="section section-shell auth-main">
         <section className="auth-wrap">
-          <p className="eyebrow">Recuperation</p>
-          <h1>Mot de passe oublie</h1>
-          <p className="auth-hint">Version basique: reinitialisation locale via email.</p>
+          <p className="eyebrow">{t('auth.forgotPassword.eyebrow')}</p>
+          <h1>{t('auth.forgotPassword.title')}</h1>
+          <p className="auth-hint">{t('auth.forgotPassword.hint')}</p>
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <label>
-              Email du compte
+              {t('auth.forgotPassword.email')}
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nom@entreprise.com"
+                placeholder={t('auth.placeholders.email')}
                 required
               />
             </label>
 
             <label>
-              Nouveau mot de passe
+              {t('auth.forgotPassword.newPassword')}
               <input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="6 caracteres minimum"
+                placeholder={t('auth.placeholders.passwordMin')}
                 required
               />
             </label>
 
             <label>
-              Confirmer nouveau mot de passe
+              {t('auth.forgotPassword.confirmPassword')}
               <input
                 type="password"
                 value={confirmNewPassword}
                 onChange={(e) => setConfirmNewPassword(e.target.value)}
-                placeholder="Retapez le mot de passe"
+                placeholder={t('auth.placeholders.retypePassword')}
                 required
               />
             </label>
 
-            <button type="submit" className="btn btn-primary">Reinitialiser</button>
+            <button type="submit" className="btn btn-primary">{t('auth.forgotPassword.submit')}</button>
           </form>
 
           <p className={`form-message ${messageType}`} aria-live="polite">
@@ -98,8 +100,8 @@ export default function ForgotPasswordPage() {
           </p>
 
           <div className="auth-links">
-            <a href="/login">Retour connexion</a>
-            <a href="/create-account">Creer un compte</a>
+            <a href="/login">{t('auth.forgotPassword.backToLogin')}</a>
+            <a href="/create-account">{t('auth.forgotPassword.createAccount')}</a>
           </div>
         </section>
       </main>

@@ -9,10 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@hugeicons/core-free-icons": "^4.1.1",
+    "@hugeicons/react": "^1.1.6",
+    "gsap": "^3.12.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.18.0",
-    "gsap": "^3.12.5"
+    "react-router-dom": "^6.18.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",

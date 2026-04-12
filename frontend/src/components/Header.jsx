@@ -1,11 +1,94 @@
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getSession, clearSession } from '../lib/authStore';
 import { logoutRequest } from '../services/authApi';
+import blackLogo from '../assets/images/black-v.png';
+import whiteLogo from '../assets/images/white-v.png';
+import englishFlag from '../assets/images/english.png';
+import frenchFlag from '../assets/images/french.svg';
+import arabicFlag from '../assets/images/arabic.png';
+import spanishFlag from '../assets/images/spanish.png';
+import artisanImage from '../assets/images/artisan.jpg';
+import agencesImage from '../assets/images/agnce.jpg';
+import startupImage from '../assets/images/startup.jpg';
+import enterpriseServicesImage from '../assets/images/Entreprise de services.jpg';
+import franchiseImage from '../assets/images/Franchise.jpg';
+import accountingExpertsImage from '../assets/images/comptable.jpeg';
+import independentSecretariesImage from '../assets/images/secretaire-independante.webp';
+import { useLanguage } from '../lib/i18n';
+
+const getInitialTheme = () => {
+  if (typeof window === 'undefined') {
+    return 'light';
+  }
+
+  const savedTheme = localStorage.getItem('stockpro-theme');
+  if (savedTheme === 'light' || savedTheme === 'dark') {
+    return savedTheme;
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+};
 
 export default function Header({ showNav = true, isDashboard = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const session = getSession();
+  const [theme, setTheme] = useState(getInitialTheme);
+  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
+  const [isAudienceMenuOpen, setIsAudienceMenuOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const languageMenuRef = useRef(null);
+  const audienceMenuRef = useRef(null);
+  const moreMenuRef = useRef(null);
+  const { language, setLanguage, t, availableLanguages } = useLanguage();
+
+  const audienceItems = [
+    { key: 'audience1', label: t('header.audience.artisan'), image: artisanImage },
+    { key: 'audience3', label: t('header.audience.agencies'), image: agencesImage },
+    { key: 'audience4', label: t('header.audience.startup'), image: startupImage },
+    { key: 'audience5', label: t('header.audience.enterpriseServices'), image: enterpriseServicesImage },
+    { key: 'audience6', label: t('header.audience.franchise'), image: franchiseImage },
+    { key: 'audience7', label: t('header.audience.accountingExperts'), image: accountingExpertsImage },
+    { key: 'audience8', label: t('header.audience.independentSecretaries'), image: independentSecretariesImage },
+  ];
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('stockpro-theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!languageMenuRef.current?.contains(event.target)) {
+        setIsLanguageMenuOpen(false);
+      }
+
+      if (!audienceMenuRef.current?.contains(event.target)) {
+        setIsAudienceMenuOpen(false);
+      }
+
+      if (!moreMenuRef.current?.contains(event.target)) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsLanguageMenuOpen(false);
+        setIsAudienceMenuOpen(false);
+        setIsMoreMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -19,33 +102,204 @@ export default function Header({ showNav = true, isDashboard = false }) {
     }
   };
 
+  const handleThemeToggle = () => {
+    setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'));
+  };
+
+  const logoSrc = theme === 'dark' ? whiteLogo : blackLogo;
+  const nextThemeLabel = theme === 'dark' ? t('header.theme.toLight') : t('header.theme.toDark');
+  const languageFlags = {
+    en: englishFlag,
+    fr: frenchFlag,
+    es: spanishFlag,
+    ar: arabicFlag,
+  };
+  const activeFlag = languageFlags[language];
+
+  const handleLogoClick = (event) => {
+    if (location.pathname === '/') {
+      event.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 0);
+  };
+
   return (
     <header className="site-header">
-      <Link to="/" className="brand">
-        <span className="brand-mark">S</span>
-        <span className="brand-text">StockPro</span>
+      <Link to="/" className="brand" onClick={handleLogoClick}>
+        <img src={logoSrc} alt="StockPro" className="site-logo" />
       </Link>
 
       {showNav && !isDashboard && (
         <nav className="nav-links">
-          <a href="#product">Product</a>
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
+          <div className="audience-menu" ref={audienceMenuRef}>
+            <button
+              type="button"
+              className="audience-trigger"
+              aria-haspopup="menu"
+              aria-expanded={isAudienceMenuOpen}
+              onClick={() => setIsAudienceMenuOpen((isOpen) => !isOpen)}
+            >
+              <span>{t('header.nav.audience')}</span>
+              <svg className="language-chevron" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path d="M5.5 7.5L10 12l4.5-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            {isAudienceMenuOpen && (
+              <div className="audience-dropdown" role="menu" aria-label={t('header.nav.audience')}>
+                {audienceItems.map((item) => (
+                  <button key={item.key} type="button" className="audience-item" role="menuitem">
+                    <img
+                      src={item.image}
+                      alt={item.label}
+                      className={`audience-item-image${item.key === 'audience1' ? ' audience-item-image-artisan' : ''}`}
+                    />
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <a href="#features">{t('header.nav.features')}</a>
+          <a href="#pricing">{t('header.nav.pricing')}</a>
+          <div className="more-menu" ref={moreMenuRef}>
+            <button
+              type="button"
+              className="more-trigger"
+              aria-haspopup="menu"
+              aria-expanded={isMoreMenuOpen}
+              onClick={() => setIsMoreMenuOpen((isOpen) => !isOpen)}
+            >
+              <span>{t('header.nav.more')}</span>
+              <svg className="language-chevron" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <path d="M5.5 7.5L10 12l4.5-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            {isMoreMenuOpen && (
+              <div className="more-dropdown" role="menu" aria-label={t('header.nav.more')}>
+                <a
+                  href="#top"
+                  className="more-option"
+                  role="menuitem"
+                  onClick={() => setIsMoreMenuOpen(false)}
+                >
+                  {t('header.more.about')}
+                </a>
+                <a
+                  href="mailto:contact@stockpro.app"
+                  className="more-option"
+                  role="menuitem"
+                  onClick={() => setIsMoreMenuOpen(false)}
+                >
+                  {t('header.more.contact')}
+                </a>
+              </div>
+            )}
+          </div>
         </nav>
       )}
 
       <div className="header-actions">
+        <div className="language-picker" ref={languageMenuRef}>
+          <button
+            type="button"
+            className="language-trigger"
+            aria-haspopup="menu"
+            aria-expanded={isLanguageMenuOpen}
+            aria-label={t('header.languageLabel')}
+            onClick={() => setIsLanguageMenuOpen((isOpen) => !isOpen)}
+          >
+            {activeFlag ? (
+              <img className="language-flag" src={activeFlag} alt="" aria-hidden="true" />
+            ) : (
+              <span className="language-flag-fallback" aria-hidden="true">•</span>
+            )}
+            <span>{t(`header.languages.${language}`)}</span>
+            <svg className="language-chevron" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <path d="M5.5 7.5L10 12l4.5-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
+
+          {isLanguageMenuOpen && (
+            <div className="language-menu" role="menu" aria-label={t('header.languageLabel')}>
+              {availableLanguages.map((langCode) => {
+                const isActive = langCode === language;
+                const flagSrc = languageFlags[langCode];
+                return (
+                  <button
+                    key={langCode}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={isActive}
+                    className={`language-option${isActive ? ' is-active' : ''}`}
+                    onClick={() => {
+                      setLanguage(langCode);
+                      setIsLanguageMenuOpen(false);
+                    }}
+                  >
+                    {flagSrc ? (
+                      <img className="language-flag" src={flagSrc} alt="" aria-hidden="true" />
+                    ) : (
+                      <span className="language-flag-fallback" aria-hidden="true">•</span>
+                    )}
+                    {t(`header.languages.${langCode}`)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <button
+          className="btn btn-ghost theme-toggle"
+          type="button"
+          onClick={handleThemeToggle}
+          aria-label={nextThemeLabel}
+          title={nextThemeLabel}
+        >
+          {theme === 'dark' ? (
+            <svg className="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+              <path
+                d="M12 2.8V5.2M12 18.8V21.2M2.8 12H5.2M18.8 12H21.2M5.45 5.45L7.15 7.15M16.85 16.85L18.55 18.55M5.45 18.55L7.15 16.85M16.85 7.15L18.55 5.45"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          ) : (
+            <svg className="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path
+                d="M14.5 2.5A9.5 9.5 0 1 0 21.5 16 7.5 7.5 0 1 1 14.5 2.5Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+        </button>
+
         {isDashboard ? (
           <>
-            <Link to="/" className="btn btn-ghost">Accueil</Link>
+            <Link to="/" className="btn btn-ghost">{t('header.actions.home')}</Link>
             <button onClick={handleLogout} className="btn btn-secondary" type="button">
-              Deconnexion
+              {t('header.actions.logout')}
             </button>
           </>
         ) : (
           <>
-            <Link to="/login" className="btn btn-ghost">Connexion</Link>
-            <a href="#pricing" className="btn btn-secondary">Start Trial</a>
+            <Link to="/login" className="btn btn-ghost">{t('header.actions.login')}</Link>
+            <a href="#pricing" className="btn btn-secondary">{t('header.actions.startTrial')}</a>
           </>
         )}
       </div>
