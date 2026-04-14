@@ -2,28 +2,15 @@ import Header from '../components/Header';
 import PageBackground from '../components/PageBackground';
 import headerStockPro1 from '../assets/images/headerStockPro1.avif';
 import robotImage from '../assets/images/robot.png';
+import inventoryImage from '../assets/images/inventory.png';
+import analyticsImage from '../assets/images/Analytique.png';
+import stockImage from '../assets/images/stcok.avif';
 import { useLanguage } from '../lib/i18n';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  AddInvoiceIcon,
-  Analytics01Icon,
   ChartUpIcon,
   ClipboardIcon,
-  FileManagementIcon,
-  ShoppingBag01Icon,
 } from '@hugeicons/core-free-icons';
-
-function FeatureCard({ title, copy, icon }) {
-  return (
-    <article className="lp-feature-card image-reveal">
-      <div className="lp-feature-icon" aria-hidden="true">
-        <HugeiconsIcon icon={icon} size={20} strokeWidth={1.8} color="currentColor" />
-      </div>
-      <h3>{title}</h3>
-      <p>{copy}</p>
-    </article>
-  );
-}
 
 function MetricCard({ label, value }) {
   return (
@@ -37,36 +24,40 @@ function MetricCard({ label, value }) {
 export default function LandingPage() {
   const { t } = useLanguage();
 
-  const featureItems = [
+  const featureSections = [
     {
-      icon: ClipboardIcon,
       title: t('landing.featureCards.smartCatalogTitle'),
-      copy: t('landing.featureCards.smartCatalogCopy'),
+      intro: t('landing.featureCards.smartCatalogCopy'),
+      items: [
+        t('landing.featureCards.smartCatalogCopy'),
+        t('landing.featureCards.realtimeCopy'),
+        t('landing.featureCards.purchaseCopy'),
+      ],
+      mediaSrc: inventoryImage,
+      mediaAlt: 'Features image placeholder one',
     },
     {
-      icon: Analytics01Icon,
-      title: t('landing.featureCards.realtimeTitle'),
-      copy: t('landing.featureCards.realtimeCopy'),
-    },
-    {
-      icon: ShoppingBag01Icon,
-      title: t('landing.featureCards.purchaseTitle'),
-      copy: t('landing.featureCards.purchaseCopy'),
-    },
-    {
-      icon: ChartUpIcon,
       title: t('landing.featureCards.analyticsTitle'),
-      copy: t('landing.featureCards.analyticsCopy'),
+      intro: t('landing.featureCards.analyticsCopy'),
+      items: [
+        t('landing.featureCards.analyticsCopy'),
+        t('landing.featureCards.workflowCopy'),
+        t('landing.featureCards.invoiceCopy'),
+      ],
+      mediaSrc: analyticsImage,
+      mediaAlt: 'Features image placeholder two',
     },
     {
-      icon: FileManagementIcon,
-      title: t('landing.featureCards.workflowTitle'),
-      copy: t('landing.featureCards.workflowCopy'),
-    },
-    {
-      icon: AddInvoiceIcon,
-      title: t('landing.featureCards.invoiceTitle'),
-      copy: t('landing.featureCards.invoiceCopy'),
+      title: 'Gerez vos stocks efficacement',
+      intro: 'Suivez votre stock en temps reel (incrementation, decrementation).',
+      items: [
+        'Suivez votre stock en temps reel (incrementation, decrementation).',
+        'Centralisez tous vos produits et services.',
+        'Fabriquez vos produits.',
+        'Creez des bons de livraisons.',
+      ],
+      mediaSrc: stockImage,
+      mediaAlt: 'Features image placeholder three',
     },
   ];
 
@@ -134,19 +125,34 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="features" className="section section-shell">
-          <div className="section-head">
+        <section id="features" className="section section-shell lp-value-section">
+          <div className="section-head lp-value-head">
             <p className="eyebrow">{t('landing.features.eyebrow')}</p>
             <h2>{t('landing.features.title')}</h2>
           </div>
-          <div className="lp-feature-grid stagger-cards">
-            {featureItems.map((feature) => (
-              <FeatureCard
-                key={feature.title}
-                title={feature.title}
-                copy={feature.copy}
-                icon={feature.icon}
-              />
+
+          <div className="lp-value-stack">
+            {featureSections.map((section, index) => (
+              <article key={section.title} className={`lp-value-card${index % 2 === 1 ? ' is-reverse' : ''}`}>
+                <div className="lp-value-copy">
+                  <span className="lp-value-chip">Inclus</span>
+                  <h3>{section.title}</h3>
+                  <p>{section.intro}</p>
+                  <ul className="lp-value-list">
+                    {section.items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="lp-value-media" role="img" aria-label={section.mediaAlt}>
+                  {section.mediaSrc ? (
+                    <img className="lp-value-media-image" src={section.mediaSrc} alt={section.mediaAlt} />
+                  ) : (
+                    <span>Image placeholder</span>
+                  )}
+                </div>
+              </article>
             ))}
           </div>
         </section>

@@ -72,7 +72,7 @@ const translations = {
             },
             features: {
                 eyebrow: 'Feature sections',
-                title: 'Everything you need to run stock and sales at scale.',
+                title: 'Website functionalities to manage stock and sales efficiently.',
             },
             stats: {
                 warehouses: 'Warehouses connected',
@@ -255,7 +255,7 @@ const translations = {
             },
             features: {
                 eyebrow: 'Fonctionnalités',
-                title: 'Tout ce qu il faut pour piloter stock et ventes à grande échelle.',
+                title: 'Fonctionnalités de StockPro pour gérer vos stocks et vos ventes.',
             },
             stats: {
                 warehouses: 'Entrepôts connectés',
@@ -438,7 +438,7 @@ const translations = {
             },
             features: {
                 eyebrow: 'Funciones',
-                title: 'Todo lo necesario para gestionar stock y ventas a escala.',
+                title: 'Funcionalidades del sitio web para gestionar stock y ventas de forma eficiente.',
             },
             stats: {
                 warehouses: 'Almacenes conectados',
@@ -621,7 +621,7 @@ const translations = {
             },
             features: {
                 eyebrow: 'المزايا',
-                title: 'كل ما تحتاجه لادارة المخزون والمبيعات على نطاق واسع.',
+                title: 'وظائف الموقع لادارة المخزون والمبيعات بكفاءة.',
             },
             stats: {
                 warehouses: 'المستودعات المتصلة',
