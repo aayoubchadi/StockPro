@@ -1912,10 +1912,14 @@ main#top>.section+.section {
 
   .audience-dropdown {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    animation: none !important;
+    transform: none !important;
   }
 
   .more-dropdown {
     min-width: 0;
+    animation: none !important;
+    transform: none !important;
   }
 
   .lp-hero,
