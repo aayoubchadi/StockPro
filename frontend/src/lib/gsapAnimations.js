@@ -15,28 +15,46 @@ const selectors = {
   dashboardCard: '.dashboard-card',
 };
 
+const getMotionContext = () => {
+  if (typeof window === 'undefined') {
+    return { reducedMotion: false, touchDevice: false };
+  }
+
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const touchDevice =
+    window.matchMedia('(hover: none)').matches ||
+    window.matchMedia('(pointer: coarse)').matches;
+
+  return { reducedMotion, touchDevice };
+};
+
 const heroIntro = () => {
   gsap.from(selectors.heroItems, {
-    y: 26,
+    y: 28,
     opacity: 0,
-    stagger: 0.14,
-    duration: 0.82,
+    stagger: 0.12,
+    duration: 0.92,
     ease: 'power3.out',
+    force3D: true,
     clearProps: 'transform,opacity',
   });
 };
 
-const setupParallax = () => {
+const setupParallax = ({ reducedMotion, touchDevice }) => {
+  if (reducedMotion || touchDevice) {
+    return;
+  }
+
   document.querySelectorAll(selectors.parallaxLayers).forEach((layer) => {
-    const speed = Number(layer.dataset.speed || 0.12);
+    const speed = Number(layer.dataset.speed || 0.05);
     gsap.to(layer, {
-      yPercent: speed * 100,
+      yPercent: speed * 75,
       ease: 'none',
       scrollTrigger: {
         trigger: 'body',
         start: 'top top',
         end: 'bottom bottom',
-        scrub: true,
+        scrub: 0.8,
       },
     });
   });
@@ -45,14 +63,17 @@ const setupParallax = () => {
 const revealSections = () => {
   gsap.utils.toArray(selectors.reveal).forEach((el) => {
     gsap.from(el, {
-      opacity: 0,
-      y: 30,
-      duration: 0.86,
+      autoAlpha: 0,
+      y: 34,
+      scale: 0.988,
+      duration: 0.94,
       ease: 'power3.out',
+      force3D: true,
+      clearProps: 'transform,opacity,visibility',
       scrollTrigger: {
         trigger: el,
-        start: 'top 82%',
-        toggleActions: 'play none none reverse',
+        start: 'top 86%',
+        once: true,
       },
     });
   });
@@ -61,15 +82,17 @@ const revealSections = () => {
 const revealImages = () => {
   gsap.utils.toArray(selectors.imageReveal).forEach((el) => {
     gsap.from(el, {
-      opacity: 0,
-      y: 24,
-      scale: 0.9,
-      duration: 0.88,
-      ease: 'power2.out',
+      autoAlpha: 0,
+      y: 26,
+      scale: 0.97,
+      duration: 0.96,
+      ease: 'power3.out',
+      force3D: true,
+      clearProps: 'transform,opacity,visibility',
       scrollTrigger: {
         trigger: el,
-        start: 'top 86%',
-        toggleActions: 'play none none reverse',
+        start: 'top 88%',
+        once: true,
       },
     });
   });
@@ -82,14 +105,18 @@ const staggerCards = () => {
   }
 
   gsap.from(cards, {
-    opacity: 0,
+    autoAlpha: 0,
     y: 30,
-    duration: 0.68,
-    stagger: 0.12,
+    scale: 0.98,
+    duration: 0.88,
+    stagger: 0.1,
     ease: 'power3.out',
+    force3D: true,
+    clearProps: 'transform,opacity,visibility',
     scrollTrigger: {
       trigger: selectors.cardsContainer,
-      start: 'top 80%',
+      start: 'top 86%',
+      once: true,
     },
   });
 };
@@ -170,7 +197,11 @@ const animateCounters = () => {
   });
 };
 
-const magneticDashboardTilt = () => {
+const magneticDashboardTilt = ({ touchDevice }) => {
+  if (touchDevice) {
+    return;
+  }
+
   const card = document.querySelector(selectors.dashboardCard);
   if (!card) {
     return;
@@ -206,15 +237,21 @@ export const initAnimations = () => {
   // Kill existing ScrollTriggers to avoid duplicates
   ScrollTrigger.getAll().forEach(trigger => trigger.kill());
 
+  const motion = getMotionContext();
+
+  if (motion.reducedMotion) {
+    return;
+  }
+
   heroIntro();
-  setupParallax();
+  setupParallax(motion);
   revealSections();
   revealImages();
   staggerCards();
   animateDashboardSidebar();
   animateDashboardBars();
   animateCounters();
-  magneticDashboardTilt();
+  magneticDashboardTilt(motion);
 
   // Refresh ScrollTrigger after all animations are set up
   ScrollTrigger.refresh();

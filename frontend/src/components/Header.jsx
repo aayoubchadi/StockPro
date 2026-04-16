@@ -47,8 +47,60 @@ export default function Header({ showNav = true, isDashboard = false }) {
   const moreMenuRef = useRef(null);
   const audienceCloseTimerRef = useRef(null);
   const moreCloseTimerRef = useRef(null);
+  const scrollAnimationFrameRef = useRef(null);
   const { language, setLanguage, t, availableLanguages } = useLanguage();
   const dropdownAnimationDurationMs = 260;
+
+  const cancelScrollAnimation = () => {
+    if (scrollAnimationFrameRef.current) {
+      window.cancelAnimationFrame(scrollAnimationFrameRef.current);
+      scrollAnimationFrameRef.current = null;
+    }
+  };
+
+  const animateScrollToHash = (hash) => {
+    if (typeof window === 'undefined' || !hash?.startsWith('#')) {
+      return;
+    }
+
+    const target = document.querySelector(hash);
+    if (!target) {
+      return;
+    }
+
+    cancelScrollAnimation();
+
+    const headerHeight = headerRef.current?.getBoundingClientRect().height ?? 0;
+    const offset = headerHeight + 14;
+    const startY = window.scrollY;
+    const endY = Math.max(0, target.getBoundingClientRect().top + window.scrollY - offset);
+    const delta = endY - startY;
+
+    if (Math.abs(delta) < 2) {
+      return;
+    }
+
+    const durationMs = 920;
+    let startTs;
+    const easeOutQuint = (progress) => 1 - ((1 - progress) ** 5);
+
+    const step = (timestamp) => {
+      if (startTs === undefined) {
+        startTs = timestamp;
+      }
+
+      const progress = Math.min(1, (timestamp - startTs) / durationMs);
+      window.scrollTo(0, startY + (delta * easeOutQuint(progress)));
+
+      if (progress < 1) {
+        scrollAnimationFrameRef.current = window.requestAnimationFrame(step);
+      } else {
+        scrollAnimationFrameRef.current = null;
+      }
+    };
+
+    scrollAnimationFrameRef.current = window.requestAnimationFrame(step);
+  };
 
   const clearAudienceCloseTimer = () => {
     if (audienceCloseTimerRef.current) {
@@ -145,10 +197,25 @@ export default function Header({ showNav = true, isDashboard = false }) {
 
   useEffect(() => {
     return () => {
+      cancelScrollAnimation();
       clearAudienceCloseTimer();
       clearMoreCloseTimer();
     };
   }, []);
+
+  useEffect(() => {
+    if (location.pathname === '/' && location.hash) {
+      const timer = window.setTimeout(() => {
+        animateScrollToHash(location.hash);
+      }, 90);
+
+      return () => {
+        window.clearTimeout(timer);
+      };
+    }
+
+    return undefined;
+  }, [location.pathname, location.hash]);
 
   const handleLogout = async () => {
     try {
@@ -235,7 +302,26 @@ export default function Header({ showNav = true, isDashboard = false }) {
     closeAudienceMenu(false);
   };
 
-  const handleNavClick = () => {
+  const handleNavClick = (event) => {
+    const href = event?.currentTarget?.getAttribute('href') || '';
+
+    if (href.startsWith('#')) {
+      event.preventDefault();
+      closeMenus();
+
+      if (location.pathname !== '/') {
+        navigate(`/${href}`);
+        return;
+      }
+
+      if (window.location.hash !== href) {
+        window.history.replaceState(null, '', href);
+      }
+
+      animateScrollToHash(href);
+      return;
+    }
+
     closeMenus();
   };
 
