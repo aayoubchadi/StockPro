@@ -108,6 +108,18 @@ export default function Header({ showNav = true, isDashboard = false }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen]);
+
   const handleLogout = async () => {
     try {
       await logoutRequest({

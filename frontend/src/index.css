@@ -1839,6 +1839,8 @@ main#top>.section+.section {
     flex-direction: column;
     gap: 18px;
     padding-bottom: 2px;
+    overflow-y: auto;
+    max-height: calc(100vh - 80px);
   }
 
   .nav-links,
@@ -2040,6 +2042,8 @@ main#top>.section+.section {
 
   .header-content.has-nav {
     padding-top: 14px;
+    overflow-y: auto;
+    max-height: calc(100vh - 80px);
   }
 
   .nav-links {
