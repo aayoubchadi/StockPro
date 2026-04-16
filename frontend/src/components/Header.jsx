@@ -166,35 +166,69 @@ export default function Header({ showNav = true, isDashboard = false }) {
       </Link>
 
       {showNav && !isDashboard && (
-        <button
-          type="button"
-          className="mobile-menu-toggle"
-          aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-          aria-expanded={isMobileMenuOpen}
-          onClick={() => setIsMobileMenuOpen((isOpen) => !isOpen)}
-        >
-          {isMobileMenuOpen ? (
-            <svg className="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path
-                d="M6 6l12 12M18 6L6 18"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-          ) : (
-            <svg className="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path
-                d="M4 7.5H20M4 12H20M4 16.5H20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-          )}
-        </button>
+        <div className="header-top-controls">
+          <button
+            className="btn btn-ghost theme-toggle mobile-theme-toggle"
+            type="button"
+            onClick={handleThemeToggle}
+            aria-label={nextThemeLabel}
+            title={nextThemeLabel}
+          >
+            {theme === 'dark' ? (
+              <svg className="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                <path
+                  d="M12 2.8V5.2M12 18.8V21.2M2.8 12H5.2M18.8 12H21.2M5.45 5.45L7.15 7.15M16.85 16.85L18.55 18.55M5.45 18.55L7.15 16.85M16.85 7.15L18.55 5.45"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            ) : (
+              <svg className="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  d="M14.5 2.5A9.5 9.5 0 1 0 21.5 16 7.5 7.5 0 1 1 14.5 2.5Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+          </button>
+
+          <button
+            type="button"
+            className="mobile-menu-toggle"
+            aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={isMobileMenuOpen}
+            onClick={() => setIsMobileMenuOpen((isOpen) => !isOpen)}
+          >
+            {isMobileMenuOpen ? (
+              <svg className="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  d="M6 6l12 12M18 6L6 18"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            ) : (
+              <svg className="theme-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  d="M4 7.5H20M4 12H20M4 16.5H20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+          </button>
+        </div>
       )}
 
       <div className={`header-content${showNav && !isDashboard ? ' has-nav' : ''}`}>
