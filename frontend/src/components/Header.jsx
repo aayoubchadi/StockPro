@@ -38,12 +38,31 @@ export default function Header({ showNav = true, isDashboard = false }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
   const [isAudienceMenuOpen, setIsAudienceMenuOpen] = useState(false);
+  const [isAudienceMenuClosing, setIsAudienceMenuClosing] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isMoreMenuClosing, setIsMoreMenuClosing] = useState(false);
   const headerRef = useRef(null);
   const languageMenuRef = useRef(null);
   const audienceMenuRef = useRef(null);
   const moreMenuRef = useRef(null);
+  const audienceCloseTimerRef = useRef(null);
+  const moreCloseTimerRef = useRef(null);
   const { language, setLanguage, t, availableLanguages } = useLanguage();
+  const dropdownAnimationDurationMs = 260;
+
+  const clearAudienceCloseTimer = () => {
+    if (audienceCloseTimerRef.current) {
+      clearTimeout(audienceCloseTimerRef.current);
+      audienceCloseTimerRef.current = null;
+    }
+  };
+
+  const clearMoreCloseTimer = () => {
+    if (moreCloseTimerRef.current) {
+      clearTimeout(moreCloseTimerRef.current);
+      moreCloseTimerRef.current = null;
+    }
+  };
 
   const audienceItems = [
     { key: 'audience1', label: t('header.audience.artisan'), image: artisanImage },
@@ -61,41 +80,45 @@ export default function Header({ showNav = true, isDashboard = false }) {
   }, [theme]);
 
   useEffect(() => {
+    clearAudienceCloseTimer();
+    clearMoreCloseTimer();
     setIsMobileMenuOpen(false);
     setIsLanguageMenuOpen(false);
     setIsAudienceMenuOpen(false);
+    setIsAudienceMenuClosing(false);
     setIsMoreMenuOpen(false);
+    setIsMoreMenuClosing(false);
   }, [location.pathname]);
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
       if (!headerRef.current?.contains(event.target)) {
+        clearAudienceCloseTimer();
+        clearMoreCloseTimer();
         setIsMobileMenuOpen(false);
         setIsLanguageMenuOpen(false);
         setIsAudienceMenuOpen(false);
+        setIsAudienceMenuClosing(false);
         setIsMoreMenuOpen(false);
+        setIsMoreMenuClosing(false);
         return;
       }
 
       if (!languageMenuRef.current?.contains(event.target)) {
         setIsLanguageMenuOpen(false);
       }
-
-      if (!audienceMenuRef.current?.contains(event.target)) {
-        setIsAudienceMenuOpen(false);
-      }
-
-      if (!moreMenuRef.current?.contains(event.target)) {
-        setIsMoreMenuOpen(false);
-      }
     };
 
     const handleEscape = (event) => {
       if (event.key === 'Escape') {
+        clearAudienceCloseTimer();
+        clearMoreCloseTimer();
         setIsMobileMenuOpen(false);
         setIsLanguageMenuOpen(false);
         setIsAudienceMenuOpen(false);
+        setIsAudienceMenuClosing(false);
         setIsMoreMenuOpen(false);
+        setIsMoreMenuClosing(false);
       }
     };
 
@@ -120,6 +143,13 @@ export default function Header({ showNav = true, isDashboard = false }) {
     };
   }, [isMobileMenuOpen]);
 
+  useEffect(() => {
+    return () => {
+      clearAudienceCloseTimer();
+      clearMoreCloseTimer();
+    };
+  }, []);
+
   const handleLogout = async () => {
     try {
       await logoutRequest({
@@ -137,16 +167,80 @@ export default function Header({ showNav = true, isDashboard = false }) {
   };
 
   const closeMenus = () => {
+    clearAudienceCloseTimer();
+    clearMoreCloseTimer();
     setIsMobileMenuOpen(false);
     setIsLanguageMenuOpen(false);
     setIsAudienceMenuOpen(false);
+    setIsAudienceMenuClosing(false);
     setIsMoreMenuOpen(false);
+    setIsMoreMenuClosing(false);
+  };
+
+  const closeAudienceMenu = (withAnimation = false) => {
+    clearAudienceCloseTimer();
+
+    if (!withAnimation || !isAudienceMenuOpen) {
+      setIsAudienceMenuOpen(false);
+      setIsAudienceMenuClosing(false);
+      return;
+    }
+
+    setIsAudienceMenuClosing(true);
+    audienceCloseTimerRef.current = window.setTimeout(() => {
+      setIsAudienceMenuOpen(false);
+      setIsAudienceMenuClosing(false);
+      audienceCloseTimerRef.current = null;
+    }, dropdownAnimationDurationMs);
+  };
+
+  const closeMoreMenu = (withAnimation = false) => {
+    clearMoreCloseTimer();
+
+    if (!withAnimation || !isMoreMenuOpen) {
+      setIsMoreMenuOpen(false);
+      setIsMoreMenuClosing(false);
+      return;
+    }
+
+    setIsMoreMenuClosing(true);
+    moreCloseTimerRef.current = window.setTimeout(() => {
+      setIsMoreMenuOpen(false);
+      setIsMoreMenuClosing(false);
+      moreCloseTimerRef.current = null;
+    }, dropdownAnimationDurationMs);
+  };
+
+  const toggleAudienceMenu = () => {
+    if (isAudienceMenuOpen && !isAudienceMenuClosing) {
+      closeAudienceMenu(true);
+      return;
+    }
+
+    clearAudienceCloseTimer();
+    setIsAudienceMenuClosing(false);
+    setIsAudienceMenuOpen(true);
+    closeMoreMenu(false);
+  };
+
+  const toggleMoreMenu = () => {
+    if (isMoreMenuOpen && !isMoreMenuClosing) {
+      closeMoreMenu(true);
+      return;
+    }
+
+    clearMoreCloseTimer();
+    setIsMoreMenuClosing(false);
+    setIsMoreMenuOpen(true);
+    closeAudienceMenu(false);
   };
 
   const handleNavClick = () => {
     closeMenus();
   };
 
+  const showLandingNavigation = showNav && !isDashboard;
+  const isCompactHeader = !showLandingNavigation && !isDashboard;
   const logoSrc = theme === 'dark' ? whiteLogo : blackLogo;
   const nextThemeLabel = theme === 'dark' ? t('header.theme.toLight') : t('header.theme.toDark');
   const languageFlags = {
@@ -172,12 +266,12 @@ export default function Header({ showNav = true, isDashboard = false }) {
   };
 
   return (
-    <header className={`site-header${showNav && !isDashboard && isMobileMenuOpen ? ' is-mobile-open' : ''}`} ref={headerRef}>
+    <header className={`site-header${showLandingNavigation && isMobileMenuOpen ? ' is-mobile-open' : ''}${isCompactHeader ? ' is-compact' : ''}`} ref={headerRef}>
       <Link to="/" className="brand" onClick={handleLogoClick}>
         <img src={logoSrc} alt="StockPro" className="site-logo" />
       </Link>
 
-      {showNav && !isDashboard && (
+      {showLandingNavigation && (
         <div className="header-top-controls">
           <button
             className="btn btn-ghost theme-toggle mobile-theme-toggle"
@@ -213,7 +307,7 @@ export default function Header({ showNav = true, isDashboard = false }) {
 
           <button
             type="button"
-            className="mobile-menu-toggle"
+            className={`btn btn-ghost theme-toggle mobile-menu-toggle${isMobileMenuOpen ? ' is-open' : ''}`}
             aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
             aria-expanded={isMobileMenuOpen}
             onClick={() => setIsMobileMenuOpen((isOpen) => !isOpen)}
@@ -243,16 +337,16 @@ export default function Header({ showNav = true, isDashboard = false }) {
         </div>
       )}
 
-      <div className={`header-content${showNav && !isDashboard ? ' has-nav' : ''}`}>
-        {showNav && !isDashboard && (
+      <div className={`header-content${showLandingNavigation ? ' has-nav' : ''}${!showLandingNavigation && !isDashboard ? ' no-nav' : ''}`}>
+        {showLandingNavigation && (
           <nav className="nav-links">
             <div className="audience-menu" ref={audienceMenuRef}>
               <button
                 type="button"
                 className="audience-trigger"
                 aria-haspopup="menu"
-                aria-expanded={isAudienceMenuOpen}
-                onClick={() => setIsAudienceMenuOpen((isOpen) => !isOpen)}
+                aria-expanded={isAudienceMenuOpen && !isAudienceMenuClosing}
+                onClick={toggleAudienceMenu}
               >
                 <span>{t('header.nav.audience')}</span>
                 <svg className="language-chevron" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -260,8 +354,8 @@ export default function Header({ showNav = true, isDashboard = false }) {
                 </svg>
               </button>
 
-              {isAudienceMenuOpen && (
-                <div className="audience-dropdown" role="menu" aria-label={t('header.nav.audience')}>
+              {(isAudienceMenuOpen || isAudienceMenuClosing) && (
+                <div className={`audience-dropdown${isAudienceMenuClosing ? ' is-closing' : ' is-open'}`} role="menu" aria-label={t('header.nav.audience')}>
                   {audienceItems.map((item) => (
                     <button key={item.key} type="button" className="audience-item" role="menuitem">
                       <img
@@ -283,8 +377,8 @@ export default function Header({ showNav = true, isDashboard = false }) {
                 type="button"
                 className="more-trigger"
                 aria-haspopup="menu"
-                aria-expanded={isMoreMenuOpen}
-                onClick={() => setIsMoreMenuOpen((isOpen) => !isOpen)}
+                aria-expanded={isMoreMenuOpen && !isMoreMenuClosing}
+                onClick={toggleMoreMenu}
               >
                 <span>{t('header.nav.more')}</span>
                 <svg className="language-chevron" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -292,8 +386,8 @@ export default function Header({ showNav = true, isDashboard = false }) {
                 </svg>
               </button>
 
-              {isMoreMenuOpen && (
-                <div className="more-dropdown" role="menu" aria-label={t('header.nav.more')}>
+              {(isMoreMenuOpen || isMoreMenuClosing) && (
+                <div className={`more-dropdown${isMoreMenuClosing ? ' is-closing' : ' is-open'}`} role="menu" aria-label={t('header.nav.more')}>
                   <a
                     href="#top"
                     className="more-option"
@@ -407,10 +501,12 @@ export default function Header({ showNav = true, isDashboard = false }) {
               </button>
             </>
           ) : (
-            <>
-              <Link to="/login" className="btn btn-ghost" onClick={handleNavClick}>{t('header.actions.login')}</Link>
-              <a href="#pricing" className="btn btn-secondary" onClick={handleNavClick}>{t('header.actions.startTrial')}</a>
-            </>
+            showLandingNavigation && (
+              <>
+                <Link to="/login" className="btn btn-ghost" onClick={handleNavClick}>{t('header.actions.login')}</Link>
+                <a href="#pricing" className="btn btn-secondary" onClick={handleNavClick}>{t('header.actions.startTrial')}</a>
+              </>
+            )
           )}
         </div>
       </div>
