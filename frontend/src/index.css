@@ -133,6 +133,36 @@ a {
   align-items: center;
 }
 
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+  margin-left: auto;
+  flex: 1 1 auto;
+}
+
+.header-content.has-nav {
+  flex-wrap: wrap;
+}
+
+.mobile-menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-900);
+  cursor: pointer;
+}
+
+.mobile-menu-toggle:hover {
+  background: rgba(47, 102, 255, 0.08);
+}
+
 .audience-menu {
   position: relative;
 }
@@ -1755,6 +1785,79 @@ main#top>.section+.section {
 
 @media (max-width: 1080px) {
 
+  .site-header {
+    align-items: flex-start;
+    padding: 18px 20px;
+  }
+
+  .mobile-menu-toggle {
+    display: inline-flex;
+    margin-left: auto;
+  }
+
+  .header-content.has-nav {
+    display: none;
+    width: 100%;
+    margin-left: 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .site-header.is-mobile-open .header-content.has-nav {
+    display: grid;
+    gap: 16px;
+  }
+
+  .nav-links,
+  .header-actions {
+    width: 100%;
+  }
+
+  .nav-links {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+  }
+
+  .header-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .language-picker {
+    width: 100%;
+  }
+
+  .language-trigger {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .header-actions .btn:not(.theme-toggle) {
+    flex: 1 1 160px;
+  }
+
+  .language-menu,
+  .audience-dropdown,
+  .more-dropdown {
+    position: static;
+    top: auto;
+    right: auto;
+    left: auto;
+    transform: none;
+    width: 100%;
+    margin-top: 10px;
+  }
+
+  .audience-dropdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .more-dropdown {
+    min-width: 0;
+  }
+
   .lp-hero,
   .lp-feature-grid,
   .lp-why-wrap,
@@ -1791,42 +1894,117 @@ main#top>.section+.section {
     order: initial;
   }
 
+  .lp-hero {
+    gap: 28px;
+    min-height: auto;
+    padding-top: 28px;
+  }
+
+  .lp-hero-visual {
+    order: -1;
+    max-width: 720px;
+  }
+
+  .lp-hero-single {
+    min-height: 360px;
+  }
+
+  .lp-mini-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lp-value-card {
+    gap: 22px;
+  }
+
+  .lp-value-media {
+    min-height: 260px;
+  }
+
   .lp-why-aside,
   .lp-why-aside-inner {
     transform: none;
   }
 
   .lp-footer-brand {
-    grid-column: span 2;
+    grid-column: auto;
+  }
+
+  .auth-main {
+    min-height: auto;
+    align-items: start;
+    padding-top: 30px;
+  }
+
+  .auth-wrap {
+    max-width: 640px;
+    width: 100%;
+    padding: 24px;
+  }
+
+  .auth-links {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboard-head h1 {
+    font-size: clamp(1.8rem, 4vw, 2.4rem);
   }
 }
 
 @media (max-width: 760px) {
   .site-header {
-    padding-inline: 16px;
-    flex-wrap: wrap;
+    padding: 16px 16px 18px;
+  }
+
+  .mobile-menu-toggle {
+    width: 42px;
+    height: 42px;
+  }
+
+  .header-content.has-nav {
+    padding-top: 14px;
   }
 
   .nav-links {
-    order: 3;
     width: 100%;
     justify-content: flex-start;
-  }
-
-  .audience-dropdown {
-    left: 0;
-    transform: none;
-    width: min(92vw, 680px);
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 14px;
   }
 
   .header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions > * {
     width: 100%;
-    justify-content: flex-start;
+  }
+
+  .header-actions .theme-toggle {
+    width: 44px;
+    align-self: flex-start;
+  }
+
+  .header-actions .btn:not(.theme-toggle) {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .nav-links a,
+  .audience-trigger,
+  .more-trigger {
+    font-size: 0.95rem;
   }
 
   .hero {
     padding-top: 22px;
+  }
+
+  .hero-actions .btn,
+  .lp-plan-cta,
+  .auth-form .btn {
+    width: 100%;
   }
 
   .lp-mini-metrics {
@@ -1879,6 +2057,10 @@ main#top>.section+.section {
     min-height: clamp(470px, 68vh, 620px);
   }
 
+  .lp-hero-single {
+    min-height: 280px;
+  }
+
   .lp-value-card {
     padding: 22px 16px;
     gap: 18px;
@@ -1914,6 +2096,21 @@ main#top>.section+.section {
   .lp-footer-bottom {
     flex-direction: column;
     align-items: flex-start;
+    gap: 10px;
+  }
+
+  .lp-pricing-grid,
+  .lp-footer-grid,
+  .dashboard-grid {
+    gap: 14px;
+  }
+
+  .lp-value-card,
+  .lp-plan-card,
+  .lp-footer-column,
+  .dashboard-box,
+  .auth-wrap {
+    padding: 20px 16px;
   }
 
   .lp-seat-control {
