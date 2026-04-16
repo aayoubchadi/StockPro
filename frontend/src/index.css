@@ -1786,19 +1786,35 @@ main#top>.section+.section {
 @media (max-width: 1080px) {
 
   .site-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: flex-start;
+    column-gap: 12px;
+    row-gap: 12px;
     padding: 18px 20px;
   }
 
   .mobile-menu-toggle {
     display: inline-flex;
-    margin-left: auto;
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .brand {
+    min-width: 0;
+  }
+
+  .header-content {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+    align-items: stretch;
   }
 
   .header-content.has-nav {
     display: none;
+    grid-column: 1 / -1;
     width: 100%;
-    margin-left: 0;
     padding-top: 16px;
     border-top: 1px solid var(--line);
   }
