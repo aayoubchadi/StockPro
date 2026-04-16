@@ -5,6 +5,8 @@ import robotImage from '../assets/images/robot.png';
 import inventoryImage from '../assets/images/inventory.png';
 import analyticsImage from '../assets/images/Analytique.png';
 import stockImage from '../assets/images/stcok.avif';
+import blackLogo from '../assets/images/black-v.png';
+import whiteLogo from '../assets/images/white-v.png';
 import { useLanguage } from '../lib/i18n';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
@@ -12,17 +14,9 @@ import {
   ClipboardIcon,
 } from '@hugeicons/core-free-icons';
 
-function MetricCard({ label, value }) {
-  return (
-    <article className="lp-metric-card">
-      <p className="label">{label}</p>
-      <p className="counter" data-target={value}>0</p>
-    </article>
-  );
-}
-
 export default function LandingPage() {
   const { t } = useLanguage();
+  const currentYear = new Date().getFullYear();
 
   const featureSections = [
     {
@@ -60,6 +54,58 @@ export default function LandingPage() {
       mediaAlt: 'Features image placeholder three',
     },
   ];
+
+  const pricingPlans = [
+    {
+      key: 'demo',
+      name: t('landing.pricing.plans.demo.name'),
+      description: t('landing.pricing.plans.demo.description'),
+      basePrice: 0,
+      cta: t('landing.pricing.plans.demo.cta'),
+      features: [
+        t('landing.pricing.plans.demo.featureOne'),
+        t('landing.pricing.plans.demo.featureTwo'),
+        t('landing.pricing.plans.demo.featureThree'),
+      ],
+      popular: false,
+    },
+    {
+      key: 'pro',
+      name: t('landing.pricing.plans.pro.name'),
+      description: t('landing.pricing.plans.pro.description'),
+      basePrice: 19,
+      includedUsers: 5,
+      cta: t('landing.pricing.plans.pro.cta'),
+      features: [
+        t('landing.pricing.plans.pro.featureOne'),
+        t('landing.pricing.plans.pro.featureTwo'),
+        t('landing.pricing.plans.pro.featureThree'),
+      ],
+      popular: true,
+    },
+    {
+      key: 'premium',
+      name: t('landing.pricing.plans.premium.name'),
+      description: t('landing.pricing.plans.premium.description'),
+      basePrice: 39,
+      includedUsers: 10,
+      cta: t('landing.pricing.plans.premium.cta'),
+      features: [
+        t('landing.pricing.plans.premium.featureOne'),
+        t('landing.pricing.plans.premium.featureTwo'),
+        t('landing.pricing.plans.premium.featureThree'),
+      ],
+      popular: false,
+    },
+  ];
+
+  const formatPrice = (amount) => {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: 'EUR',
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
 
   return (
     <>
@@ -157,33 +203,92 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="section section-shell">
-          <div className="lp-stats-band">
-            <MetricCard label={t('landing.stats.warehouses')} value="42" />
-            <MetricCard label={t('landing.stats.purchaseRules')} value="780" />
-            <MetricCard label={t('landing.stats.timeSaved')} value="31" />
-            <MetricCard label={t('landing.stats.alerts')} value="120" />
-          </div>
-
-          <div className="lp-testimonial">
-            <p>{t('landing.testimonial.quote')}</p>
-            <div>
-              <strong>Rami Haddad</strong>
-              <span>{t('landing.testimonial.role')}</span>
-            </div>
-          </div>
-        </section>
-
-        <section id="pricing" className="section section-shell">
-          <div className="pricing-box">
+        <section id="pricing" className="section section-shell lp-pricing-section">
+          <div className="section-head lp-pricing-head">
             <div>
               <p className="eyebrow">{t('landing.pricing.eyebrow')}</p>
               <h2>{t('landing.pricing.title')}</h2>
               <p>{t('landing.pricing.subtitle')}</p>
             </div>
-            <a href="#top" className="btn btn-primary">{t('landing.pricing.button')}</a>
+          </div>
+
+          <div className="lp-pricing-grid">
+            {pricingPlans.map((plan) => {
+              const billedUsers = plan.includedUsers ?? 0;
+              const monthlyPrice = plan.basePrice * billedUsers;
+              const isFreePlan = plan.basePrice === 0;
+
+              return (
+                <article key={plan.key} className={`lp-plan-card${plan.popular ? ' is-popular' : ''}`}>
+                  {plan.popular ? <span className="lp-plan-badge">{t('landing.pricing.mostPopular')}</span> : null}
+
+                  <div className="lp-plan-head">
+                    <h3>{plan.name}</h3>
+                    <p>{plan.description}</p>
+                  </div>
+
+                  <div className="lp-plan-price-wrap">
+                    <p className="lp-plan-price">
+                      {isFreePlan ? t('landing.pricing.freeLabel') : formatPrice(monthlyPrice)}
+                      {!isFreePlan ? <span> / {t('landing.pricing.perMonth')}</span> : null}
+                    </p>
+                    <p className="lp-plan-unit">
+                      {isFreePlan ? t('landing.pricing.demoNote') : `${formatPrice(plan.basePrice)} ${t('landing.pricing.perUser')} • ${plan.includedUsers} ${t('landing.pricing.userUnit')}`}
+                    </p>
+                  </div>
+
+                  <ul className="lp-plan-list">
+                    {plan.features.map((feature) => (
+                      <li key={feature}>{feature}</li>
+                    ))}
+                  </ul>
+
+                  <a href="#top" className={`btn ${plan.popular ? 'btn-primary' : 'btn-secondary'} lp-plan-cta`}>
+                    {plan.cta}
+                  </a>
+                </article>
+              );
+            })}
           </div>
         </section>
+
+        <footer id="contact" className="section section-shell lp-footer">
+          <div className="lp-footer-grid">
+            <div className="lp-footer-brand">
+              <img src={blackLogo} alt="StockPro" className="lp-footer-logo lp-footer-logo-light" />
+              <img src={whiteLogo} alt="StockPro" className="lp-footer-logo lp-footer-logo-dark" />
+              <p className="lp-footer-kicker">{t('landing.footer.kicker')}</p>
+              <p className="lp-footer-copy">{t('landing.footer.copy')}</p>
+              <a href="/create-account" className="btn btn-primary lp-footer-cta">{t('landing.footer.primaryCta')}</a>
+            </div>
+
+            <div className="lp-footer-column">
+              <h4>{t('landing.footer.productTitle')}</h4>
+              <a href="#product">{t('landing.footer.links.product')}</a>
+              <a href="#features">{t('landing.footer.links.features')}</a>
+              <a href="#pricing">{t('landing.footer.links.pricing')}</a>
+            </div>
+
+            <div className="lp-footer-column">
+              <h4>{t('landing.footer.companyTitle')}</h4>
+              <a href="#top">{t('landing.footer.links.home')}</a>
+              <a href="#contact">{t('landing.footer.links.contact')}</a>
+              <a href="mailto:contact@stockpro.app">{t('landing.footer.links.email')}</a>
+            </div>
+
+            <div className="lp-footer-column">
+              <h4>{t('landing.footer.accountTitle')}</h4>
+              <a href="/login">{t('landing.footer.links.login')}</a>
+              <a href="/create-account">{t('landing.footer.links.createAccount')}</a>
+              <a href="/forgot-password">{t('landing.footer.links.forgotPassword')}</a>
+            </div>
+          </div>
+
+          <div className="lp-footer-bottom">
+            <span>{`© ${currentYear} StockPro. ${t('landing.footer.rights')}`}</span>
+            <a href="#top">{t('landing.footer.backToTop')}</a>
+          </div>
+        </footer>
       </main>
     </>
   );
