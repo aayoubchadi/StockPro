@@ -8,14 +8,8 @@ import englishFlag from '../assets/images/english.png';
 import frenchFlag from '../assets/images/french.svg';
 import arabicFlag from '../assets/images/arabic.png';
 import spanishFlag from '../assets/images/spanish.png';
-import artisanImage from '../assets/images/artisan.jpg';
-import agencesImage from '../assets/images/agnce.jpg';
-import startupImage from '../assets/images/startup.jpg';
-import enterpriseServicesImage from '../assets/images/Entreprise de services.jpg';
-import franchiseImage from '../assets/images/Franchise.jpg';
-import accountingExpertsImage from '../assets/images/comptable.jpeg';
-import independentSecretariesImage from '../assets/images/secretaire-independante.webp';
 import { useLanguage } from '../lib/i18n';
+import { audienceProfiles } from '../lib/audienceProfiles';
 
 const getInitialTheme = () => {
   if (typeof window === 'undefined') {
@@ -116,15 +110,13 @@ export default function Header({ showNav = true, isDashboard = false }) {
     }
   };
 
-  const audienceItems = [
-    { key: 'audience1', label: t('header.audience.artisan'), image: artisanImage },
-    { key: 'audience3', label: t('header.audience.agencies'), image: agencesImage },
-    { key: 'audience4', label: t('header.audience.startup'), image: startupImage },
-    { key: 'audience5', label: t('header.audience.enterpriseServices'), image: enterpriseServicesImage },
-    { key: 'audience6', label: t('header.audience.franchise'), image: franchiseImage },
-    { key: 'audience7', label: t('header.audience.accountingExperts'), image: accountingExpertsImage },
-    { key: 'audience8', label: t('header.audience.independentSecretaries'), image: independentSecretariesImage },
-  ];
+  const audienceItems = audienceProfiles.map((profile) => ({
+    key: profile.key,
+    label: t(profile.menuLabelKey || profile.labelKey),
+    image: profile.image,
+    imageClassName: profile.imageClassName,
+    path: `/who-is-it-for/${profile.slug}`,
+  }));
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -325,6 +317,11 @@ export default function Header({ showNav = true, isDashboard = false }) {
     closeMenus();
   };
 
+  const handleAudienceItemClick = (path) => {
+    closeMenus();
+    navigate(path);
+  };
+
   const showLandingNavigation = showNav && !isDashboard;
   const isCompactHeader = !showLandingNavigation && !isDashboard;
   const logoSrc = theme === 'dark' ? whiteLogo : blackLogo;
@@ -443,11 +440,17 @@ export default function Header({ showNav = true, isDashboard = false }) {
               {(isAudienceMenuOpen || isAudienceMenuClosing) && (
                 <div className={`audience-dropdown${isAudienceMenuClosing ? ' is-closing' : ' is-open'}`} role="menu" aria-label={t('header.nav.audience')}>
                   {audienceItems.map((item) => (
-                    <button key={item.key} type="button" className="audience-item" role="menuitem">
+                    <button
+                      key={item.key}
+                      type="button"
+                      className="audience-item"
+                      role="menuitem"
+                      onClick={() => handleAudienceItemClick(item.path)}
+                    >
                       <img
                         src={item.image}
                         alt={item.label}
-                        className={`audience-item-image${item.key === 'audience1' ? ' audience-item-image-artisan' : ''}`}
+                        className={`audience-item-image${item.imageClassName ? ` ${item.imageClassName}` : ''}`}
                       />
                       <span>{item.label}</span>
                     </button>
@@ -474,22 +477,22 @@ export default function Header({ showNav = true, isDashboard = false }) {
 
               {(isMoreMenuOpen || isMoreMenuClosing) && (
                 <div className={`more-dropdown${isMoreMenuClosing ? ' is-closing' : ' is-open'}`} role="menu" aria-label={t('header.nav.more')}>
-                  <a
-                    href="#top"
+                  <Link
+                    to="/who-we-are"
                     className="more-option"
                     role="menuitem"
-                    onClick={handleNavClick}
+                    onClick={closeMenus}
                   >
                     {t('header.more.about')}
-                  </a>
-                  <a
-                    href="mailto:contact@stockpro.app"
+                  </Link>
+                  <Link
+                    to="/contact-us"
                     className="more-option"
                     role="menuitem"
-                    onClick={handleNavClick}
+                    onClick={closeMenus}
                   >
                     {t('header.more.contact')}
-                  </a>
+                  </Link>
                 </div>
               )}
             </div>

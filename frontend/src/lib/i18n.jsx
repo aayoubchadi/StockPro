@@ -257,7 +257,7 @@ const translations = {
             },
             more: {
                 about: 'Qui sommes-nous ?',
-                contact: 'Contact us',
+                contact: 'Contactez-nous',
             },
             audience: {
                 artisan: 'artisan',

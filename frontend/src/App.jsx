@@ -7,6 +7,9 @@ import CreateAccountPage from './pages/CreateAccountPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ClientDashboardPage from './pages/ClientDashboardPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
+import AudienceDetailPage from './pages/AudienceDetailPage';
+import WhoWeArePage from './pages/WhoWeArePage';
+import ContactUsPage from './pages/ContactUsPage';
 import { LanguageProvider } from './lib/i18n';
 import './index.css';
 
@@ -31,6 +34,9 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/create-account" element={<CreateAccountPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/who-we-are" element={<WhoWeArePage />} />
+          <Route path="/contact-us" element={<ContactUsPage />} />
+          <Route path="/who-is-it-for/:audienceSlug" element={<AudienceDetailPage />} />
           <Route path="/client-dashboard" element={<ClientDashboardPage />} />
           <Route path="/admin-dashboard" element={<AdminDashboardPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
