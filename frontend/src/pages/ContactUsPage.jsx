@@ -9,23 +9,28 @@ const pageCopy = {
         heroEyebrow: 'Contact',
         heroTitle: 'Contact us',
         heroSubtitle:
-            'Tell us about your needs and we will get back to you as soon as possible.',
+            'Share your request and we will reply with clear next steps.',
         infoTitle: 'Contact information',
         infoSubtitle:
-            'You can use the form or send us an email directly. We are based in Agadir, Morocco.',
+            'Use the form for project requests, or contact us directly by email.',
         emailLabel: 'Email',
         emailValue: 'contact@stockpro.app',
         locationLabel: 'Location',
         locationValue: 'Agadir, Morocco',
         availabilityLabel: 'Availability',
-        availabilityValue: 'Monday to Friday, 09:00 - 18:00',
+        availabilityValue: 'Monday to Friday, 09:00 - 18:00 (GMT+1)',
+        directEmailLabel: 'Email us directly',
+        responseTitle: 'Response time',
+        responseValue: 'Within one business day',
         formTitle: 'Send us a message',
+        formSubtitle: 'Provide a few details so we can route your request quickly.',
         nameLabel: 'Full name',
         emailInputLabel: 'Email',
         subjectLabel: 'Subject',
         messageLabel: 'Message',
         submitLabel: 'Send message',
-        success: 'Thanks for your message. We will contact you soon.',
+        privacyNote: 'Your information is only used to reply to your request.',
+        success: 'Message sent successfully. We will contact you shortly.',
         placeholders: {
             name: 'Your full name',
             email: 'name@company.com',
@@ -37,23 +42,28 @@ const pageCopy = {
         heroEyebrow: 'Contact',
         heroTitle: 'Contactez-nous',
         heroSubtitle:
-            'Partagez votre besoin et nous vous repondrons dans les meilleurs delais.',
+            'Partagez votre besoin et nous reviendrons vers vous avec des etapes claires.',
         infoTitle: 'Informations de contact',
         infoSubtitle:
-            'Vous pouvez utiliser le formulaire ou nous ecrire directement par email. Nous sommes bases a Agadir, Maroc.',
+            'Utilisez le formulaire pour les demandes projet, ou contactez-nous directement par email.',
         emailLabel: 'Email',
         emailValue: 'contact@stockpro.app',
         locationLabel: 'Localisation',
         locationValue: 'Agadir, Maroc',
         availabilityLabel: 'Disponibilite',
-        availabilityValue: 'Lundi a vendredi, 09:00 - 18:00',
+        availabilityValue: 'Lundi a vendredi, 09:00 - 18:00 (GMT+1)',
+        directEmailLabel: 'Nous ecrire directement',
+        responseTitle: 'Delai de reponse',
+        responseValue: 'Sous un jour ouvrable',
         formTitle: 'Envoyer un message',
+        formSubtitle: 'Donnez quelques details pour orienter rapidement votre demande.',
         nameLabel: 'Nom complet',
         emailInputLabel: 'Email',
         subjectLabel: 'Sujet',
         messageLabel: 'Message',
         submitLabel: 'Envoyer',
-        success: 'Merci pour votre message. Nous vous contacterons rapidement.',
+        privacyNote: 'Vos informations servent uniquement a repondre a votre demande.',
+        success: 'Message envoye avec succes. Nous vous contacterons rapidement.',
         placeholders: {
             name: 'Votre nom complet',
             email: 'nom@entreprise.com',
@@ -113,49 +123,62 @@ export default function ContactUsPage() {
                     <div className="contact-grid">
                         <article className="contact-info-card feature-card reveal">
                             <h2>{copy.infoTitle}</h2>
-                            <p>{copy.infoSubtitle}</p>
+                            <p className="contact-card-intro">{copy.infoSubtitle}</p>
+
+                            <div className="contact-quick-actions">
+                                <a href={`mailto:${copy.emailValue}`} className="contact-quick-link">
+                                    {copy.directEmailLabel}
+                                </a>
+                            </div>
 
                             <ul className="contact-info-list">
-                                <li>
+                                <li className="contact-info-item">
                                     <span>{copy.emailLabel}</span>
                                     <a href={`mailto:${copy.emailValue}`}>{copy.emailValue}</a>
                                 </li>
-                                <li>
+                                <li className="contact-info-item">
                                     <span>{copy.locationLabel}</span>
                                     <strong>{copy.locationValue}</strong>
                                 </li>
-                                <li>
+                                <li className="contact-info-item">
                                     <span>{copy.availabilityLabel}</span>
                                     <strong>{copy.availabilityValue}</strong>
+                                </li>
+                                <li className="contact-info-item">
+                                    <span>{copy.responseTitle}</span>
+                                    <strong>{copy.responseValue}</strong>
                                 </li>
                             </ul>
                         </article>
 
                         <article className="contact-form-card feature-card reveal">
                             <h2>{copy.formTitle}</h2>
+                            <p className="contact-card-intro">{copy.formSubtitle}</p>
 
                             <form className="contact-form" onSubmit={handleSubmit}>
-                                <label>
-                                    {copy.nameLabel}
-                                    <input
-                                        type="text"
-                                        value={name}
-                                        onChange={(event) => setName(event.target.value)}
-                                        placeholder={copy.placeholders.name}
-                                        required
-                                    />
-                                </label>
+                                <div className="contact-form-row">
+                                    <label>
+                                        {copy.nameLabel}
+                                        <input
+                                            type="text"
+                                            value={name}
+                                            onChange={(event) => setName(event.target.value)}
+                                            placeholder={copy.placeholders.name}
+                                            required
+                                        />
+                                    </label>
 
-                                <label>
-                                    {copy.emailInputLabel}
-                                    <input
-                                        type="email"
-                                        value={email}
-                                        onChange={(event) => setEmail(event.target.value)}
-                                        placeholder={copy.placeholders.email}
-                                        required
-                                    />
-                                </label>
+                                    <label>
+                                        {copy.emailInputLabel}
+                                        <input
+                                            type="email"
+                                            value={email}
+                                            onChange={(event) => setEmail(event.target.value)}
+                                            placeholder={copy.placeholders.email}
+                                            required
+                                        />
+                                    </label>
+                                </div>
 
                                 <label>
                                     {copy.subjectLabel}
@@ -179,7 +202,12 @@ export default function ContactUsPage() {
                                     />
                                 </label>
 
-                                <button type="submit" className="btn btn-primary">{copy.submitLabel}</button>
+                                <div className="contact-form-actions">
+                                    <button type="submit" className="btn btn-primary contact-submit-btn">
+                                        {copy.submitLabel}
+                                    </button>
+                                    <p className="contact-form-note">{copy.privacyNote}</p>
+                                </div>
 
                                 <p className={`form-message ${feedback ? 'success' : ''}`} aria-live="polite">
                                     {feedback}
