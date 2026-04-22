@@ -147,6 +147,68 @@ async function findTenantUsersByEmail(email) {
   });
 }
 
+async function verifyGoogleIdToken(idToken) {
+  const token = normalizeValue(idToken);
+
+  if (!token) {
+    throw new HttpError(
+      400,
+      'AUTH_VALIDATION_ERROR',
+      'idToken is required'
+    );
+  }
+
+  const response = await fetch(
+    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`
+  );
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok || !payload) {
+    throw new HttpError(
+      401,
+      'AUTH_GOOGLE_TOKEN_INVALID',
+      'Invalid Google identity token'
+    );
+  }
+
+  const issuer = normalizeValue(payload.iss);
+  const audience = normalizeValue(payload.aud);
+  const email = normalizeEmail(payload.email);
+
+  if (
+    issuer !== 'accounts.google.com' &&
+    issuer !== 'https://accounts.google.com'
+  ) {
+    throw new HttpError(
+      401,
+      'AUTH_GOOGLE_TOKEN_INVALID',
+      'Invalid Google token issuer'
+    );
+  }
+
+  if (env.googleClientId && audience !== env.googleClientId) {
+    throw new HttpError(
+      401,
+      'AUTH_GOOGLE_TOKEN_INVALID',
+      'Google token audience mismatch'
+    );
+  }
+
+  if (String(payload.email_verified) !== 'true' || !email) {
+    throw new HttpError(
+      401,
+      'AUTH_GOOGLE_EMAIL_UNVERIFIED',
+      'Google account email must be verified'
+    );
+  }
+
+  return {
+    email,
+    subject: normalizeValue(payload.sub),
+    name: normalizeValue(payload.name) || null,
+  };
+}
+
 router.post('/register', registerRateLimiter, async (request, response, next) => {
   try {
     const companyId = normalizeValue(request.body.companyId);
@@ -525,6 +587,224 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
       failureCode: error?.code || 'INTERNAL_SERVER_ERROR',
       ipAddress: request.ip,
       userAgent: request.headers['user-agent'] || null,
+    });
+
+    next(error);
+  }
+});
+
+router.post('/login/google', loginRateLimiter, async (request, response, next) => {
+  try {
+    const accountScope = normalizeValue(request.body.accountScope);
+    const companyId = normalizeValue(request.body.companyId);
+    const googleIdentity = await verifyGoogleIdToken(request.body.idToken);
+    const email = googleIdentity.email;
+
+    if (accountScope && accountScope !== 'tenant' && accountScope !== 'platform') {
+      throw new HttpError(
+        400,
+        'AUTH_VALIDATION_ERROR',
+        'accountScope must be either tenant or platform'
+      );
+    }
+
+    if (!accountScope || accountScope === 'platform') {
+      const { rows: platformRows } = await query(
+        `SELECT id, full_name, email::text AS email, is_active
+         FROM platform_admins
+         WHERE email = $1
+         LIMIT 1`,
+        [email]
+      );
+
+      if (platformRows.length === 1) {
+        const admin = platformRows[0];
+
+        if (!admin.is_active) {
+          throw new HttpError(403, 'AUTH_ACCOUNT_DISABLED', 'Account is disabled');
+        }
+
+        const tokens = await issueSessionTokens({
+          principalId: admin.id,
+          scope: 'platform',
+          role: 'platform_admin',
+          companyId: null,
+          email: admin.email,
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent'] || null,
+        });
+
+        response.json({
+          data: {
+            accessToken: tokens.accessToken,
+            tokenType: 'Bearer',
+            expiresIn: env.jwtAccessTtlSeconds,
+            refreshToken: tokens.refreshToken,
+            refreshExpiresIn: env.jwtRefreshTtlSeconds,
+            user: {
+              id: admin.id,
+              companyId: null,
+              fullName: admin.full_name,
+              email: admin.email,
+              role: 'platform_admin',
+              scope: 'platform',
+            },
+          },
+        });
+
+        await logAuthEvent({
+          eventType: 'login_google',
+          principalId: admin.id,
+          scope: 'platform',
+          email: admin.email,
+          success: true,
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent'] || null,
+          metadata: {
+            provider: 'google',
+            googleSubject: googleIdentity.subject || null,
+          },
+        });
+
+        return;
+      }
+
+      if (accountScope === 'platform') {
+        throw new HttpError(
+          401,
+          'AUTH_INVALID_CREDENTIALS',
+          'No platform account found for this Google user'
+        );
+      }
+    }
+
+    if (!accountScope || accountScope === 'tenant') {
+      let resolvedCompanyId = companyId;
+
+      if (!resolvedCompanyId) {
+        const matchingUsers = await findTenantUsersByEmail(email);
+
+        if (matchingUsers.length > 1) {
+          throw new HttpError(
+            409,
+            'AUTH_VALIDATION_ERROR',
+            'Multiple tenant accounts found for this email. Please provide companyId.'
+          );
+        }
+
+        if (matchingUsers.length !== 1) {
+          throw new HttpError(
+            401,
+            'AUTH_INVALID_CREDENTIALS',
+            'No tenant account found for this Google user'
+          );
+        }
+
+        resolvedCompanyId = matchingUsers[0].company_id;
+      }
+
+      if (!isUuid(resolvedCompanyId)) {
+        throw new HttpError(
+          400,
+          'AUTH_VALIDATION_ERROR',
+          'companyId must be a valid UUID'
+        );
+      }
+
+      const { rows } = await runWithCompanyScope(resolvedCompanyId, (client) =>
+        client.query(
+          `SELECT
+             u.id,
+             u.company_id,
+             c.slug AS company_slug,
+             u.full_name,
+             u.email::text AS email,
+             u.role,
+             u.is_active
+           FROM users u
+           JOIN companies c ON c.id = u.company_id
+           WHERE u.email = $1
+             AND u.company_id = $2
+           LIMIT 2`,
+          [email, resolvedCompanyId]
+        )
+      );
+
+      if (rows.length !== 1) {
+        throw new HttpError(
+          401,
+          'AUTH_INVALID_CREDENTIALS',
+          'No tenant account found for this Google user'
+        );
+      }
+
+      const user = rows[0];
+
+      if (!user.is_active) {
+        throw new HttpError(403, 'AUTH_ACCOUNT_DISABLED', 'Account is disabled');
+      }
+
+      const tokens = await issueSessionTokens({
+        principalId: user.id,
+        scope: 'tenant',
+        role: user.role,
+        companyId: user.company_id,
+        email: user.email,
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'] || null,
+      });
+
+      response.json({
+        data: {
+          accessToken: tokens.accessToken,
+          tokenType: 'Bearer',
+          expiresIn: env.jwtAccessTtlSeconds,
+          refreshToken: tokens.refreshToken,
+          refreshExpiresIn: env.jwtRefreshTtlSeconds,
+          user: {
+            id: user.id,
+            companyId: user.company_id,
+            companySlug: user.company_slug,
+            fullName: user.full_name,
+            email: user.email,
+            role: user.role,
+            scope: 'tenant',
+          },
+        },
+      });
+
+      await logAuthEvent({
+        eventType: 'login_google',
+        principalId: user.id,
+        scope: 'tenant',
+        companyId: user.company_id,
+        email: user.email,
+        success: true,
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'] || null,
+        metadata: {
+          provider: 'google',
+          googleSubject: googleIdentity.subject || null,
+        },
+      });
+
+      return;
+    }
+
+    throw new HttpError(401, 'AUTH_INVALID_CREDENTIALS', 'Invalid account scope');
+  } catch (error) {
+    await logAuthEvent({
+      eventType: 'login_google',
+      scope: normalizeValue(request.body.accountScope) || null,
+      companyId: normalizeValue(request.body.companyId) || null,
+      email: null,
+      success: false,
+      failureCode: error?.code || 'INTERNAL_SERVER_ERROR',
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
+      metadata: {
+        provider: 'google',
+      },
     });
 
     next(error);

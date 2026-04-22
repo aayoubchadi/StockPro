@@ -98,6 +98,10 @@ Optional with defaults (must be integer >= 1 when provided):
 - `AUTH_RATE_LIMIT_REFRESH_WINDOW_MS` (default `60000`)
 - `AUTH_RATE_LIMIT_REFRESH_MAX` (default `20`)
 
+Optional:
+
+- `GOOGLE_CLIENT_ID`: expected Google OAuth Client ID used to validate Google ID token audience for `POST /api/v1/auth/login/google`
+
 Required:
 
 - `JWT_ACCESS_SECRET`: non-empty JWT signing secret
@@ -120,6 +124,7 @@ Then request `GET /health`. The response includes database status when connectio
 - `GET /health` returns uptime, timestamp, and PostgreSQL connectivity status.
 - `POST /api/v1/auth/register` creates tenant user with password policy enforcement.
 - `POST /api/v1/auth/login` returns access + refresh tokens.
+- `POST /api/v1/auth/login/google` verifies Google ID token and returns access + refresh tokens for existing accounts.
 - `POST /api/v1/auth/refresh` rotates refresh token and returns new token pair.
 - `POST /api/v1/auth/logout` revokes access token and optional refresh session.
 - `GET /api/v1/auth/me` verifies bearer access token and returns auth claims.

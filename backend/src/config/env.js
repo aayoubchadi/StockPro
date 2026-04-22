@@ -73,6 +73,7 @@ export const env = {
   dbConnectionTimeoutMs: parseInteger('DB_CONNECTION_TIMEOUT_MS', 5000, 1),
   jwtIssuer: process.env.JWT_ISSUER || 'stockpro-api',
   jwtAudience: process.env.JWT_AUDIENCE || 'stockpro-client',
+  googleClientId: process.env.GOOGLE_CLIENT_ID || '',
   jwtAccessSecret: readRequired('JWT_ACCESS_SECRET'),
   jwtAccessTtlSeconds: parseInteger('JWT_ACCESS_TTL_SECONDS', 900, 60),
   jwtRefreshTtlSeconds: parseInteger('JWT_REFRESH_TTL_SECONDS', 604800, 60),

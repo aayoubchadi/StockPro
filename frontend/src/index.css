@@ -3014,6 +3014,49 @@ main#top.contact-page>.section+.section {
   border-color: var(--brand-500);
 }
 
+.auth-social-divider {
+  position: relative;
+  text-align: center;
+  margin-top: 6px;
+}
+
+.auth-social-divider::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px solid var(--line);
+}
+
+.auth-social-divider span {
+  position: relative;
+  padding: 0 10px;
+  background: #fff;
+  color: var(--ink-500);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.google-login-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.google-login-button {
+  min-height: 44px;
+  width: 100%;
+}
+
+.google-login-wrap small,
+.auth-google-missing {
+  color: var(--ink-500);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
 .auth-links {
   margin-top: 14px;
   display: flex;

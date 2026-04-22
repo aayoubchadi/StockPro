@@ -43,6 +43,36 @@ export async function loginRequest({ email, password, accountScope, companyId })
   return payload?.data;
 }
 
+export async function googleLoginRequest({ idToken, accountScope, companyId }) {
+  const body = {
+    idToken,
+  };
+
+  if (accountScope) {
+    body.accountScope = accountScope;
+  }
+
+  if (companyId) {
+    body.companyId = companyId;
+  }
+
+  const response = await fetch(`${API_BASE}/api/v1/auth/login/google`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await parseJsonSafe(response);
+
+  if (!response.ok) {
+    throw new Error(resolveErrorMessage(payload, 'Google login failed'));
+  }
+
+  return payload?.data;
+}
+
 export async function logoutRequest({ accessToken, refreshToken }) {
   if (!accessToken) {
     return;
