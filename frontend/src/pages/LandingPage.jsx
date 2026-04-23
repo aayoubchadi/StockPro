@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import PageBackground from '../components/PageBackground';
 import headerStockPro1 from '../assets/images/headerStockPro1.avif';
@@ -15,9 +16,11 @@ import {
   ClipboardIcon,
 } from '@hugeicons/core-free-icons';
 import { cleanupAnimations, initAnimations } from '../lib/gsapAnimations';
+import { getSession } from '../lib/authStore';
 
 export default function LandingPage() {
   const { t, language } = useLanguage();
+  const navigate = useNavigate();
   const currentYear = new Date().getFullYear();
 
   useEffect(() => {
@@ -118,6 +121,18 @@ export default function LandingPage() {
       currency: 'EUR',
       maximumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const handlePricingChoiceClick = (event) => {
+    const session = getSession();
+    const isLoggedIn = Boolean(session?.accessToken && session?.user?.email);
+
+    if (isLoggedIn) {
+      return;
+    }
+
+    event.preventDefault();
+    navigate('/create-account?redirect=pricing');
   };
 
   return (
@@ -256,7 +271,11 @@ export default function LandingPage() {
                     ))}
                   </ul>
 
-                  <a href="#top" className={`btn ${plan.popular ? 'btn-primary' : 'btn-secondary'} lp-plan-cta`}>
+                  <a
+                    href="#top"
+                    className={`btn ${plan.popular ? 'btn-primary' : 'btn-secondary'} lp-plan-cta`}
+                    onClick={handlePricingChoiceClick}
+                  >
                     {plan.cta}
                   </a>
                 </article>

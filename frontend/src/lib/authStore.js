@@ -1,6 +1,13 @@
 const STORAGE_KEY = 'stockpro_accounts';
 const SESSION_KEY = 'stockpro_session';
 const AUTH_PREFS_KEY = 'stockpro_auth_prefs';
+const SESSION_EVENT = 'stockpro:session-changed';
+
+function notifySessionChanged() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(SESSION_EVENT));
+  }
+}
 
 export const getAccounts = () => {
   try {
@@ -18,6 +25,7 @@ export const saveAccounts = (accounts) => {
 
 export const saveSession = (session) => {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  notifySessionChanged();
 };
 
 export const getSession = () => {
@@ -31,7 +39,10 @@ export const getSession = () => {
 
 export const clearSession = () => {
   localStorage.removeItem(SESSION_KEY);
+  notifySessionChanged();
 };
+
+export const getSessionChangeEventName = () => SESSION_EVENT;
 
 export const getAuthPrefs = () => {
   try {

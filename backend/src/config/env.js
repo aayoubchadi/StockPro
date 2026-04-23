@@ -74,6 +74,8 @@ export const env = {
   jwtIssuer: process.env.JWT_ISSUER || 'stockpro-api',
   jwtAudience: process.env.JWT_AUDIENCE || 'stockpro-client',
   googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+  defaultTenantCompanyId: process.env.DEFAULT_TENANT_COMPANY_ID || '',
+  defaultTenantCompanySlug: process.env.DEFAULT_TENANT_COMPANY_SLUG || '',
   jwtAccessSecret: readRequired('JWT_ACCESS_SECRET'),
   jwtAccessTtlSeconds: parseInteger('JWT_ACCESS_TTL_SECONDS', 900, 60),
   jwtRefreshTtlSeconds: parseInteger('JWT_REFRESH_TTL_SECONDS', 604800, 60),

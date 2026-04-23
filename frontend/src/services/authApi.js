@@ -9,7 +9,16 @@ async function parseJsonSafe(response) {
 }
 
 function resolveErrorMessage(payload, fallback) {
-  return payload?.error?.message || fallback;
+  const baseMessage = payload?.error?.message || fallback;
+  const details = Array.isArray(payload?.error?.details)
+    ? payload.error.details.filter(Boolean)
+    : [];
+
+  if (details.length === 0) {
+    return baseMessage;
+  }
+
+  return `${baseMessage}: ${details.join(', ')}`;
 }
 
 export async function loginRequest({ email, password, accountScope, companyId }) {
@@ -68,6 +77,61 @@ export async function googleLoginRequest({ idToken, accountScope, companyId }) {
 
   if (!response.ok) {
     throw new Error(resolveErrorMessage(payload, 'Google login failed'));
+  }
+
+  return payload?.data;
+}
+
+export async function registerRequest({ companyId, fullName, email, password, role }) {
+  const body = {
+    companyId,
+    fullName,
+    email,
+    password,
+  };
+
+  if (role) {
+    body.role = role;
+  }
+
+  const response = await fetch(`${API_BASE}/api/v1/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await parseJsonSafe(response);
+
+  if (!response.ok) {
+    throw new Error(resolveErrorMessage(payload, 'Create account failed'));
+  }
+
+  return payload?.data;
+}
+
+export async function registerGoogleRequest({ idToken, companyId }) {
+  const body = {
+    idToken,
+  };
+
+  if (companyId) {
+    body.companyId = companyId;
+  }
+
+  const response = await fetch(`${API_BASE}/api/v1/auth/register/google`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await parseJsonSafe(response);
+
+  if (!response.ok) {
+    throw new Error(resolveErrorMessage(payload, 'Google sign-up failed'));
   }
 
   return payload?.data;

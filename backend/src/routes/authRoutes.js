@@ -147,6 +147,81 @@ async function findTenantUsersByEmail(email) {
   });
 }
 
+async function resolveTenantCompanyIdForRegister(requestedCompanyId) {
+  const normalizedCompanyId = normalizeValue(requestedCompanyId);
+
+  if (normalizedCompanyId) {
+    if (!isUuid(normalizedCompanyId)) {
+      throw new HttpError(
+        400,
+        'AUTH_VALIDATION_ERROR',
+        'companyId must be a valid UUID'
+      );
+    }
+
+    return normalizedCompanyId;
+  }
+
+  if (env.defaultTenantCompanyId) {
+    if (!isUuid(env.defaultTenantCompanyId)) {
+      throw new HttpError(
+        500,
+        'INTERNAL_SERVER_ERROR',
+        'DEFAULT_TENANT_COMPANY_ID must be a valid UUID'
+      );
+    }
+
+    return env.defaultTenantCompanyId;
+  }
+
+  if (env.defaultTenantCompanySlug) {
+    const { rows: slugRows } = await query(
+      `SELECT id
+       FROM companies
+       WHERE slug = $1
+         AND is_active = TRUE
+       LIMIT 1`,
+      [env.defaultTenantCompanySlug]
+    );
+
+    if (slugRows.length === 1) {
+      return slugRows[0].id;
+    }
+
+    throw new HttpError(
+      400,
+      'AUTH_VALIDATION_ERROR',
+      'Registration company could not be resolved from DEFAULT_TENANT_COMPANY_SLUG'
+    );
+  }
+
+  const { rows } = await query(
+    `SELECT id
+     FROM companies
+     WHERE is_active = TRUE
+     ORDER BY created_at ASC
+     LIMIT 2`
+  );
+
+  if (rows.length === 1) {
+    return rows[0].id;
+  }
+
+  if (rows.length === 0) {
+    throw new HttpError(
+      400,
+      'AUTH_VALIDATION_ERROR',
+      'No active company available for registration'
+    );
+  }
+
+  throw new HttpError(
+    400,
+    'AUTH_VALIDATION_ERROR',
+    'Multiple companies exist. Configure DEFAULT_TENANT_COMPANY_ID or DEFAULT_TENANT_COMPANY_SLUG on the server.'
+  );
+}
+
 async function verifyGoogleIdToken(idToken) {
   const token = normalizeValue(idToken);
 
@@ -209,7 +284,32 @@ async function verifyGoogleIdToken(idToken) {
   };
 }
 
+async function findTenantUserByEmailInCompany(companyId, email) {
+  const { rows } = await runWithCompanyScope(companyId, (client) =>
+    client.query(
+      `SELECT
+         u.id,
+         u.company_id,
+         c.slug AS company_slug,
+         u.full_name,
+         u.email::text AS email,
+         u.role,
+         u.is_active
+       FROM users u
+       JOIN companies c ON c.id = u.company_id
+       WHERE u.email = $1
+         AND u.company_id = $2
+       LIMIT 1`,
+      [email, companyId]
+    )
+  );
+
+  return rows[0] || null;
+}
+
 router.post('/register', registerRateLimiter, async (request, response, next) => {
+  let resolvedCompanyId = null;
+
   try {
     const companyId = normalizeValue(request.body.companyId);
     const fullName = normalizeValue(request.body.fullName);
@@ -217,21 +317,15 @@ router.post('/register', registerRateLimiter, async (request, response, next) =>
     const password = normalizeValue(request.body.password);
     const role = normalizeRole(request.body.role);
 
-    if (!companyId || !fullName || !email || !password) {
+    if (!fullName || !email || !password) {
       throw new HttpError(
         400,
         'AUTH_VALIDATION_ERROR',
-        'companyId, fullName, email, and password are required'
+        'fullName, email, and password are required'
       );
     }
 
-    if (!isUuid(companyId)) {
-      throw new HttpError(
-        400,
-        'AUTH_VALIDATION_ERROR',
-        'companyId must be a valid UUID'
-      );
-    }
+    resolvedCompanyId = await resolveTenantCompanyIdForRegister(companyId);
 
     if (fullName.length < 2 || fullName.length > 120) {
       throw new HttpError(
@@ -263,12 +357,12 @@ router.post('/register', registerRateLimiter, async (request, response, next) =>
     const passwordHash = await bcrypt.hash(password, 12);
 
     try {
-      const { rows } = await runWithCompanyScope(companyId, (client) =>
+      const { rows } = await runWithCompanyScope(resolvedCompanyId, (client) =>
         client.query(
           `INSERT INTO users (company_id, full_name, email, password_hash, role)
            VALUES ($1, $2, $3, $4, $5)
            RETURNING id, company_id, full_name, email::text AS email, role, is_active, created_at`,
-          [companyId, fullName, email, passwordHash, role]
+          [resolvedCompanyId, fullName, email, passwordHash, role]
         )
       );
 
@@ -345,7 +439,7 @@ router.post('/register', registerRateLimiter, async (request, response, next) =>
     await logAuthEvent({
       eventType: 'register',
       scope: 'tenant',
-      companyId: normalizeValue(request.body.companyId) || null,
+      companyId: resolvedCompanyId,
       email: normalizeEmail(request.body.email) || null,
       success: false,
       failureCode: error?.code || 'INTERNAL_SERVER_ERROR',
@@ -797,6 +891,99 @@ router.post('/login/google', loginRateLimiter, async (request, response, next) =
       eventType: 'login_google',
       scope: normalizeValue(request.body.accountScope) || null,
       companyId: normalizeValue(request.body.companyId) || null,
+      email: null,
+      success: false,
+      failureCode: error?.code || 'INTERNAL_SERVER_ERROR',
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
+      metadata: {
+        provider: 'google',
+      },
+    });
+
+    next(error);
+  }
+});
+
+router.post('/register/google', registerRateLimiter, async (request, response, next) => {
+  let resolvedCompanyId = null;
+
+  try {
+    const googleIdentity = await verifyGoogleIdToken(request.body.idToken);
+    const email = googleIdentity.email;
+    const requestedCompanyId = normalizeValue(request.body.companyId);
+    resolvedCompanyId = await resolveTenantCompanyIdForRegister(requestedCompanyId);
+
+    let user = await findTenantUserByEmailInCompany(resolvedCompanyId, email);
+
+    if (user && !user.is_active) {
+      throw new HttpError(403, 'AUTH_ACCOUNT_DISABLED', 'Account is disabled');
+    }
+
+    if (!user) {
+      const fullName = googleIdentity.name || email.split('@')[0] || 'Google User';
+      const randomPasswordHash = await bcrypt.hash(generateRefreshToken(), 12);
+
+      const { rows } = await runWithCompanyScope(resolvedCompanyId, (client) =>
+        client.query(
+          `INSERT INTO users (company_id, full_name, email, password_hash, role)
+           VALUES ($1, $2, $3, $4, 'employee')
+           RETURNING id, company_id, full_name, email::text AS email, role, is_active`,
+          [resolvedCompanyId, fullName, email, randomPasswordHash]
+        )
+      );
+
+      user = rows[0];
+    }
+
+    const tokens = await issueSessionTokens({
+      principalId: user.id,
+      scope: 'tenant',
+      role: user.role,
+      companyId: user.company_id,
+      email: user.email,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
+    });
+
+    response.status(201).json({
+      data: {
+        accessToken: tokens.accessToken,
+        tokenType: 'Bearer',
+        expiresIn: env.jwtAccessTtlSeconds,
+        refreshToken: tokens.refreshToken,
+        refreshExpiresIn: env.jwtRefreshTtlSeconds,
+        user: {
+          id: user.id,
+          companyId: user.company_id,
+          companySlug: user.company_slug,
+          fullName: user.full_name,
+          email: user.email,
+          role: user.role,
+          scope: 'tenant',
+        },
+      },
+    });
+
+    await logAuthEvent({
+      eventType: 'register_google',
+      principalId: user.id,
+      scope: 'tenant',
+      companyId: user.company_id,
+      email: user.email,
+      success: true,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
+      metadata: {
+        provider: 'google',
+        googleSubject: googleIdentity.subject || null,
+      },
+    });
+  } catch (error) {
+    await logAuthEvent({
+      eventType: 'register_google',
+      scope: 'tenant',
+      companyId: resolvedCompanyId,
       email: null,
       success: false,
       failureCode: error?.code || 'INTERNAL_SERVER_ERROR',

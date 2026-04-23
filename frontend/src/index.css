@@ -1199,6 +1199,20 @@ a {
   align-items: center;
 }
 
+.auth-status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(14, 138, 100, 0.25);
+  background: rgba(14, 138, 100, 0.12);
+  color: #0e8a64;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
 .language-picker {
   display: inline-flex;
   align-items: center;
@@ -3055,6 +3069,13 @@ main#top.contact-page>.section+.section {
   color: var(--ink-500);
   font-size: 0.82rem;
   text-align: center;
+}
+
+.auth-policy-hint {
+  margin-top: -4px;
+  color: var(--ink-500);
+  font-size: 0.8rem;
+  line-height: 1.4;
 }
 
 .auth-links {

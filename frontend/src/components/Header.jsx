@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getSession, clearSession } from '../lib/authStore';
+import { getSession, clearSession, getDashboardPathForRole, getSessionChangeEventName } from '../lib/authStore';
 import { logoutRequest } from '../services/authApi';
 import blackLogo from '../assets/images/black-v.png';
 import whiteLogo from '../assets/images/white-v.png';
@@ -27,7 +27,7 @@ const getInitialTheme = () => {
 export default function Header({ showNav = true, isDashboard = false }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const session = getSession();
+  const [session, setSession] = useState(() => getSession());
   const [theme, setTheme] = useState(getInitialTheme);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
@@ -209,6 +209,27 @@ export default function Header({ showNav = true, isDashboard = false }) {
     return undefined;
   }, [location.pathname, location.hash]);
 
+  useEffect(() => {
+    const syncSession = () => {
+      setSession(getSession());
+    };
+
+    const onStorage = (event) => {
+      if (event.key === 'stockpro_session') {
+        syncSession();
+      }
+    };
+
+    const sessionEventName = getSessionChangeEventName();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener(sessionEventName, syncSession);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener(sessionEventName, syncSession);
+    };
+  }, []);
+
   const handleLogout = async () => {
     try {
       await logoutRequest({
@@ -324,6 +345,8 @@ export default function Header({ showNav = true, isDashboard = false }) {
 
   const showLandingNavigation = showNav && !isDashboard;
   const isCompactHeader = !showLandingNavigation && !isDashboard;
+  const isLoggedIn = Boolean(session?.accessToken && session?.user?.email);
+  const dashboardPath = getDashboardPathForRole(session?.user?.role || session?.role || 'employee');
   const logoSrc = theme === 'dark' ? whiteLogo : blackLogo;
   const nextThemeLabel = theme === 'dark' ? t('header.theme.toLight') : t('header.theme.toDark');
   const languageFlags = {
@@ -500,6 +523,8 @@ export default function Header({ showNav = true, isDashboard = false }) {
         )}
 
         <div className="header-actions">
+          {isLoggedIn && <span className="auth-status-pill">You are logged</span>}
+
           <div className="language-picker" ref={languageMenuRef}>
             <button
               type="button"
@@ -591,10 +616,19 @@ export default function Header({ showNav = true, isDashboard = false }) {
             </>
           ) : (
             showLandingNavigation && (
-              <>
-                <Link to="/login" className="btn btn-ghost" onClick={handleNavClick}>{t('header.actions.login')}</Link>
-                <a href="#pricing" className="btn btn-secondary" onClick={handleNavClick}>{t('header.actions.startTrial')}</a>
-              </>
+              isLoggedIn ? (
+                <>
+                  <Link to={dashboardPath} className="btn btn-ghost" onClick={handleNavClick}>Dashboard</Link>
+                  <button onClick={handleLogout} className="btn btn-secondary" type="button">
+                    {t('header.actions.logout')}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link to="/login" className="btn btn-ghost" onClick={handleNavClick}>{t('header.actions.login')}</Link>
+                  <a href="#pricing" className="btn btn-secondary" onClick={handleNavClick}>{t('header.actions.startTrial')}</a>
+                </>
+              )
             )
           )}
         </div>
