@@ -9,6 +9,21 @@
 -- 4) stockpro@admin.com   -> StockPro@Admin2026 (platform/master admin)
 -- Password hashes are generated with pgcrypto crypt(..., gen_salt('bf')).
 
+-- Reset auth sessions for seeded accounts so reseeding does not keep stale sessions.
+WITH seeded_auth_emails (email) AS (
+  VALUES
+    ('admin@acme.local'::citext),
+    ('employee1@acme.local'::citext),
+    ('admin@nova.local'::citext),
+    ('stockpro@admin.com'::citext)
+)
+DELETE FROM auth_sessions s
+USING seeded_auth_emails sae
+WHERE s.email = sae.email;
+
+DELETE FROM auth_access_token_blacklist
+WHERE expires_at <= NOW();
+
 INSERT INTO platform_admins (email, password_hash, full_name, is_active)
 VALUES
   ('stockpro@admin.com', crypt('StockPro@Admin2026', gen_salt('bf', 10)), 'StockPro Master Admin', TRUE)

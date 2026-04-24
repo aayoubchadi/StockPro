@@ -133,8 +133,7 @@ async function findTenantUsersByEmail(email) {
         `SELECT id, company_id, full_name, email::text AS email, password_hash, role, is_active
          FROM users
          WHERE email = $1
-         ORDER BY created_at ASC
-         LIMIT 2`,
+         ORDER BY created_at ASC`,
         [email]
       );
 
@@ -412,6 +411,14 @@ router.post('/register', registerRateLimiter, async (request, response, next) =>
             'This company already has an active company admin'
           );
         }
+
+        if (String(dbError.constraint || '').toLowerCase().includes('email')) {
+          throw new HttpError(
+            409,
+            'AUTH_VALIDATION_ERROR',
+            'A user with this email already exists'
+          );
+        }
       }
 
       if (dbError?.code === '23503') {
@@ -556,15 +563,7 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
       if (!resolvedCompanyId) {
         const matchingUsers = await findTenantUsersByEmail(email);
 
-        if (matchingUsers.length > 1) {
-          throw new HttpError(
-            409,
-            'AUTH_VALIDATION_ERROR',
-            'Multiple tenant accounts found for this email. Please contact support.'
-          );
-        }
-
-        if (matchingUsers.length !== 1) {
+        if (matchingUsers.length === 0) {
           throw new HttpError(
             401,
             'AUTH_INVALID_CREDENTIALS',
@@ -572,7 +571,36 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
           );
         }
 
-        resolvedCompanyId = matchingUsers[0].company_id;
+        const passwordMatchedUsers = [];
+
+        for (const candidateUser of matchingUsers) {
+          const candidateMatches = await bcrypt.compare(
+            password,
+            candidateUser.password_hash
+          );
+
+          if (candidateMatches) {
+            passwordMatchedUsers.push(candidateUser);
+          }
+        }
+
+        if (passwordMatchedUsers.length === 0) {
+          throw new HttpError(
+            401,
+            'AUTH_INVALID_CREDENTIALS',
+            'Invalid email or password'
+          );
+        }
+
+        const activePasswordMatchedUsers = passwordMatchedUsers.filter(
+          (candidateUser) => candidateUser.is_active
+        );
+
+        if (activePasswordMatchedUsers.length === 0) {
+          throw new HttpError(403, 'AUTH_ACCOUNT_DISABLED', 'Account is disabled');
+        }
+
+        resolvedCompanyId = activePasswordMatchedUsers[0].company_id;
       }
 
       if (!isUuid(resolvedCompanyId)) {
@@ -778,15 +806,7 @@ router.post('/login/google', loginRateLimiter, async (request, response, next) =
       if (!resolvedCompanyId) {
         const matchingUsers = await findTenantUsersByEmail(email);
 
-        if (matchingUsers.length > 1) {
-          throw new HttpError(
-            409,
-            'AUTH_VALIDATION_ERROR',
-            'Multiple tenant accounts found for this email. Please provide companyId.'
-          );
-        }
-
-        if (matchingUsers.length !== 1) {
+        if (matchingUsers.length === 0) {
           throw new HttpError(
             401,
             'AUTH_INVALID_CREDENTIALS',
@@ -794,7 +814,15 @@ router.post('/login/google', loginRateLimiter, async (request, response, next) =
           );
         }
 
-        resolvedCompanyId = matchingUsers[0].company_id;
+        const activeMatchingUsers = matchingUsers.filter(
+          (candidateUser) => candidateUser.is_active
+        );
+
+        if (activeMatchingUsers.length === 0) {
+          throw new HttpError(403, 'AUTH_ACCOUNT_DISABLED', 'Account is disabled');
+        }
+
+        resolvedCompanyId = activeMatchingUsers[0].company_id;
       }
 
       if (!isUuid(resolvedCompanyId)) {
@@ -926,9 +954,21 @@ router.post('/register/google', registerRateLimiter, async (request, response, n
 
       const { rows } = await runWithCompanyScope(resolvedCompanyId, (client) =>
         client.query(
-          `INSERT INTO users (company_id, full_name, email, password_hash, role)
-           VALUES ($1, $2, $3, $4, 'employee')
-           RETURNING id, company_id, full_name, email::text AS email, role, is_active`,
+          `WITH inserted_user AS (
+             INSERT INTO users (company_id, full_name, email, password_hash, role)
+             VALUES ($1, $2, $3, $4, 'employee')
+             RETURNING id, company_id, full_name, email::text AS email, role, is_active
+           )
+           SELECT
+             iu.id,
+             iu.company_id,
+             c.slug AS company_slug,
+             iu.full_name,
+             iu.email,
+             iu.role,
+             iu.is_active
+           FROM inserted_user iu
+           JOIN companies c ON c.id = iu.company_id`,
           [resolvedCompanyId, fullName, email, randomPasswordHash]
         )
       );

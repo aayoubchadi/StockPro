@@ -101,6 +101,8 @@ Optional with defaults (must be integer >= 1 when provided):
 Optional:
 
 - `GOOGLE_CLIENT_ID`: expected Google OAuth Client ID used to validate Google ID token audience for `POST /api/v1/auth/login/google`
+- `DEFAULT_TENANT_COMPANY_ID`: optional UUID used when register requests omit `companyId`
+- `DEFAULT_TENANT_COMPANY_SLUG`: optional slug fallback used when `DEFAULT_TENANT_COMPANY_ID` is not set (`.env.example` defaults to `acme-logistics` for seeded local dev)
 
 Required:
 
@@ -144,8 +146,11 @@ Then request `GET /health`. The response includes database status when connectio
    - `DB_POOL_MAX`
    - `DB_IDLE_TIMEOUT_MS`
    - `DB_CONNECTION_TIMEOUT_MS`
-5. Start the backend with `npm run dev` from the repository root or `npm run dev --workspace backend`.
-6. If startup fails, fix the env file first. The server validates the contract before accepting traffic.
+5. If you keep multiple active tenant companies in local seed data, set one of:
+   - `DEFAULT_TENANT_COMPANY_ID`
+   - `DEFAULT_TENANT_COMPANY_SLUG`
+6. Start the backend with `npm run dev` from the repository root or `npm run dev --workspace backend`.
+7. If startup fails, fix the env file first. The server validates the contract before accepting traffic.
 
 Verification checks:
 

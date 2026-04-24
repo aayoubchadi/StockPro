@@ -1,4 +1,16 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_CANDIDATES = Array.from(
+  new Set(
+    [
+      import.meta.env.VITE_API_BASE_URL,
+      'http://localhost:5000',
+      'http://localhost:5010',
+    ]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+  )
+);
+
+const FALLBACK_STATUS_CODES = new Set([404, 502, 503, 504]);
 
 async function parseJsonSafe(response) {
   try {
@@ -21,6 +33,67 @@ function resolveErrorMessage(payload, fallback) {
   return `${baseMessage}: ${details.join(', ')}`;
 }
 
+function shouldRetryWithNextBase({ response, payload }) {
+  if (response.ok) {
+    return false;
+  }
+
+  if (FALLBACK_STATUS_CODES.has(response.status)) {
+    return true;
+  }
+
+  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+
+  if (!contentType.includes('application/json')) {
+    return true;
+  }
+
+  return !payload || (!payload.error && !payload.data);
+}
+
+async function fetchAuthEndpoint(path, options) {
+  let lastResponse = null;
+  let lastPayload = null;
+  let lastError = null;
+
+  for (let index = 0; index < API_BASE_CANDIDATES.length; index += 1) {
+    const apiBase = API_BASE_CANDIDATES[index];
+    const hasNextCandidate = index < API_BASE_CANDIDATES.length - 1;
+
+    try {
+      const response = await fetch(`${apiBase}${path}`, options);
+      const payload = await parseJsonSafe(response);
+
+      lastResponse = response;
+      lastPayload = payload;
+
+      if (hasNextCandidate && shouldRetryWithNextBase({ response, payload })) {
+        continue;
+      }
+
+      return {
+        response,
+        payload,
+      };
+    } catch (error) {
+      lastError = error;
+
+      if (!hasNextCandidate) {
+        throw error;
+      }
+    }
+  }
+
+  if (lastResponse) {
+    return {
+      response: lastResponse,
+      payload: lastPayload,
+    };
+  }
+
+  throw lastError || new Error('Unable to reach authentication service');
+}
+
 export async function loginRequest({ email, password, accountScope, companyId }) {
   const body = {
     email,
@@ -35,15 +108,13 @@ export async function loginRequest({ email, password, accountScope, companyId })
     body.companyId = companyId;
   }
 
-  const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
+  const { response, payload } = await fetchAuthEndpoint('/api/v1/auth/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
   });
-
-  const payload = await parseJsonSafe(response);
 
   if (!response.ok) {
     throw new Error(resolveErrorMessage(payload, 'Login failed'));
@@ -65,15 +136,13 @@ export async function googleLoginRequest({ idToken, accountScope, companyId }) {
     body.companyId = companyId;
   }
 
-  const response = await fetch(`${API_BASE}/api/v1/auth/login/google`, {
+  const { response, payload } = await fetchAuthEndpoint('/api/v1/auth/login/google', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
   });
-
-  const payload = await parseJsonSafe(response);
 
   if (!response.ok) {
     throw new Error(resolveErrorMessage(payload, 'Google login failed'));
@@ -94,15 +163,13 @@ export async function registerRequest({ companyId, fullName, email, password, ro
     body.role = role;
   }
 
-  const response = await fetch(`${API_BASE}/api/v1/auth/register`, {
+  const { response, payload } = await fetchAuthEndpoint('/api/v1/auth/register', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
   });
-
-  const payload = await parseJsonSafe(response);
 
   if (!response.ok) {
     throw new Error(resolveErrorMessage(payload, 'Create account failed'));
@@ -120,15 +187,13 @@ export async function registerGoogleRequest({ idToken, companyId }) {
     body.companyId = companyId;
   }
 
-  const response = await fetch(`${API_BASE}/api/v1/auth/register/google`, {
+  const { response, payload } = await fetchAuthEndpoint('/api/v1/auth/register/google', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
   });
-
-  const payload = await parseJsonSafe(response);
 
   if (!response.ok) {
     throw new Error(resolveErrorMessage(payload, 'Google sign-up failed'));
@@ -142,7 +207,7 @@ export async function logoutRequest({ accessToken, refreshToken }) {
     return;
   }
 
-  await fetch(`${API_BASE}/api/v1/auth/logout`, {
+  await fetchAuthEndpoint('/api/v1/auth/logout', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

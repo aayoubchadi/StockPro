@@ -174,8 +174,63 @@ CREATE TABLE IF NOT EXISTS auth_audit_events (
 
 -- Existing database compatibility: ensure constraints and legacy index replacements.
 DO $$
+DECLARE
+  legacy_constraint_name TEXT;
+  legacy_index_name TEXT;
 BEGIN
   IF to_regclass('public.users') IS NOT NULL THEN
+    -- Normalize legacy schemas that used TEXT emails and global email uniqueness.
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'users'
+        AND column_name = 'email'
+        AND udt_name <> 'citext'
+    ) THEN
+      ALTER TABLE public.users
+      ALTER COLUMN email TYPE CITEXT
+      USING email::citext;
+    END IF;
+
+    -- Normalize legacy role labels from previous auth models.
+    UPDATE public.users
+    SET role = 'company_admin'
+    WHERE role::text = 'admin';
+
+    UPDATE public.users
+    SET role = 'employee'
+    WHERE role::text IN ('client', 'user');
+
+    FOR legacy_constraint_name IN
+      SELECT con.conname
+      FROM pg_constraint con
+      WHERE con.conrelid = 'public.users'::regclass
+        AND con.contype = 'u'
+        AND pg_get_constraintdef(con.oid) ILIKE '%(email)%'
+        AND pg_get_constraintdef(con.oid) NOT ILIKE '%(company_id, email)%'
+    LOOP
+      EXECUTE format(
+        'ALTER TABLE public.users DROP CONSTRAINT IF EXISTS %I',
+        legacy_constraint_name
+      );
+    END LOOP;
+
+    FOR legacy_index_name IN
+      SELECT idx.indexname
+      FROM pg_indexes idx
+      WHERE idx.schemaname = 'public'
+        AND idx.tablename = 'users'
+        AND idx.indexdef ILIKE 'CREATE UNIQUE INDEX%'
+        AND (
+          idx.indexdef ILIKE '%(email)%'
+          OR idx.indexdef ILIKE '%(lower((email)::text))%'
+        )
+        AND idx.indexdef NOT ILIKE '%(company_id, email)%'
+    LOOP
+      EXECUTE format('DROP INDEX IF EXISTS public.%I', legacy_index_name);
+    END LOOP;
+
     IF NOT EXISTS (
       SELECT 1 FROM pg_constraint
       WHERE conname = 'uq_users_company_email'
@@ -214,6 +269,19 @@ BEGIN
   END IF;
 
   IF to_regclass('public.platform_admins') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'platform_admins'
+        AND column_name = 'email'
+        AND udt_name <> 'citext'
+    ) THEN
+      ALTER TABLE public.platform_admins
+      ALTER COLUMN email TYPE CITEXT
+      USING email::citext;
+    END IF;
+
     IF NOT EXISTS (
       SELECT 1 FROM pg_constraint
       WHERE conname = 'ck_platform_admins_email_not_blank'
@@ -234,6 +302,36 @@ BEGIN
       ADD CONSTRAINT ck_platform_admins_full_name_not_blank
       CHECK (length(btrim(full_name)) > 0) NOT VALID;
       ALTER TABLE public.platform_admins VALIDATE CONSTRAINT ck_platform_admins_full_name_not_blank;
+    END IF;
+  END IF;
+
+  IF to_regclass('public.auth_sessions') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'auth_sessions'
+        AND column_name = 'email'
+        AND udt_name <> 'citext'
+    ) THEN
+      ALTER TABLE public.auth_sessions
+      ALTER COLUMN email TYPE CITEXT
+      USING email::citext;
+    END IF;
+  END IF;
+
+  IF to_regclass('public.auth_audit_events') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'auth_audit_events'
+        AND column_name = 'email'
+        AND udt_name <> 'citext'
+    ) THEN
+      ALTER TABLE public.auth_audit_events
+      ALTER COLUMN email TYPE CITEXT
+      USING email::citext;
     END IF;
   END IF;
 END
