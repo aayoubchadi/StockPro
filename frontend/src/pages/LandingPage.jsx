@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import PageBackground from '../components/PageBackground';
@@ -16,12 +16,15 @@ import {
   ClipboardIcon,
 } from '@hugeicons/core-free-icons';
 import { cleanupAnimations, initAnimations } from '../lib/gsapAnimations';
-import { getSession } from '../lib/authStore';
+import { getBillingPlans } from '../services/platformApi';
 
 export default function LandingPage() {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const currentYear = new Date().getFullYear();
+  const [pricingPlans, setPricingPlans] = useState([]);
+  const [isPricingLoading, setIsPricingLoading] = useState(true);
+  const [pricingError, setPricingError] = useState('');
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -33,6 +36,63 @@ export default function LandingPage() {
       cleanupAnimations();
     };
   }, [language]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadPricingPlans = async () => {
+      setIsPricingLoading(true);
+
+      try {
+        const plans = await getBillingPlans();
+
+        if (!isActive) {
+          return;
+        }
+
+        setPricingPlans(
+          plans.map((plan, index) => ({
+            key: plan.code,
+            code: plan.code,
+            name: plan.name,
+            description: `Up to ${plan.maxEmployees} users included`,
+            monthlyPriceCents: plan.monthlyPriceCents,
+            currencyCode: plan.currencyCode,
+            includedUsers: plan.maxEmployees,
+            cta: 'Pay with PayPal',
+            features: [
+              `${plan.maxEmployees} active employee seats`,
+              plan.features?.canExportReports
+                ? 'Exports and reporting enabled'
+                : 'Core reporting suite',
+              plan.features?.canUseAdvancedAnalytics
+                ? 'Advanced analytics included'
+                : 'Standard analytics included',
+            ],
+            popular: index === 1,
+          }))
+        );
+
+        setPricingError('');
+      } catch (error) {
+        if (!isActive) {
+          return;
+        }
+
+        setPricingError(error.message || 'Could not load pricing plans right now.');
+      } finally {
+        if (isActive) {
+          setIsPricingLoading(false);
+        }
+      }
+    };
+
+    loadPricingPlans();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   const featureSections = [
     {
@@ -71,68 +131,17 @@ export default function LandingPage() {
     },
   ];
 
-  const pricingPlans = [
-    {
-      key: 'demo',
-      name: t('landing.pricing.plans.demo.name'),
-      description: t('landing.pricing.plans.demo.description'),
-      basePrice: 0,
-      cta: t('landing.pricing.plans.demo.cta'),
-      features: [
-        t('landing.pricing.plans.demo.featureOne'),
-        t('landing.pricing.plans.demo.featureTwo'),
-        t('landing.pricing.plans.demo.featureThree'),
-      ],
-      popular: false,
-    },
-    {
-      key: 'pro',
-      name: t('landing.pricing.plans.pro.name'),
-      description: t('landing.pricing.plans.pro.description'),
-      basePrice: 19,
-      includedUsers: 5,
-      cta: t('landing.pricing.plans.pro.cta'),
-      features: [
-        t('landing.pricing.plans.pro.featureOne'),
-        t('landing.pricing.plans.pro.featureTwo'),
-        t('landing.pricing.plans.pro.featureThree'),
-      ],
-      popular: true,
-    },
-    {
-      key: 'premium',
-      name: t('landing.pricing.plans.premium.name'),
-      description: t('landing.pricing.plans.premium.description'),
-      basePrice: 39,
-      includedUsers: 10,
-      cta: t('landing.pricing.plans.premium.cta'),
-      features: [
-        t('landing.pricing.plans.premium.featureOne'),
-        t('landing.pricing.plans.premium.featureTwo'),
-        t('landing.pricing.plans.premium.featureThree'),
-      ],
-      popular: false,
-    },
-  ];
-
-  const formatPrice = (amount) => {
+  const formatPrice = (amount, currencyCode = 'EUR') => {
     return new Intl.NumberFormat(undefined, {
       style: 'currency',
-      currency: 'EUR',
+      currency: currencyCode,
       maximumFractionDigits: 0,
     }).format(amount);
   };
 
-  const handlePricingChoiceClick = (event) => {
-    const session = getSession();
-    const isLoggedIn = Boolean(session?.accessToken && session?.user?.email);
-
-    if (isLoggedIn) {
-      return;
-    }
-
+  const handlePricingChoiceClick = (event, planCode) => {
     event.preventDefault();
-    navigate('/create-account?redirect=pricing');
+    navigate(`/company-admin-checkout?plan=${encodeURIComponent(planCode)}`);
   };
 
   return (
@@ -237,14 +246,19 @@ export default function LandingPage() {
               <p className="eyebrow">{t('landing.pricing.eyebrow')}</p>
               <h2>{t('landing.pricing.title')}</h2>
               <p>{t('landing.pricing.subtitle')}</p>
+              <p className="lp-pricing-subnote">
+                Company admin account creation is secured through PayPal subscription checkout.
+              </p>
             </div>
           </div>
 
+          {pricingError ? <p className="form-message error">{pricingError}</p> : null}
+          {isPricingLoading ? <p className="lp-pricing-loading">Loading subscription plans...</p> : null}
+
           <div className="lp-pricing-grid stagger-cards">
             {pricingPlans.map((plan) => {
-              const billedUsers = plan.includedUsers ?? 0;
-              const monthlyPrice = plan.basePrice * billedUsers;
-              const isFreePlan = plan.basePrice === 0;
+              const monthlyPriceCents = Number(plan.monthlyPriceCents || 0);
+              const monthlyPrice = monthlyPriceCents / 100;
 
               return (
                 <article key={plan.key} className={`lp-plan-card feature-card${plan.popular ? ' is-popular' : ''}`}>
@@ -257,11 +271,11 @@ export default function LandingPage() {
 
                   <div className="lp-plan-price-wrap">
                     <p className="lp-plan-price">
-                      {isFreePlan ? t('landing.pricing.freeLabel') : formatPrice(monthlyPrice)}
-                      {!isFreePlan ? <span> / {t('landing.pricing.perMonth')}</span> : null}
+                      {formatPrice(monthlyPrice, plan.currencyCode)}
+                      <span> / {t('landing.pricing.perMonth')}</span>
                     </p>
                     <p className="lp-plan-unit">
-                      {isFreePlan ? t('landing.pricing.demoNote') : `${formatPrice(plan.basePrice)} ${t('landing.pricing.perUser')} • ${plan.includedUsers} ${t('landing.pricing.userUnit')}`}
+                      {`${plan.includedUsers} users • billed monthly`}
                     </p>
                   </div>
 
@@ -274,7 +288,7 @@ export default function LandingPage() {
                   <a
                     href="#top"
                     className={`btn ${plan.popular ? 'btn-primary' : 'btn-secondary'} lp-plan-cta`}
-                    onClick={handlePricingChoiceClick}
+                    onClick={(event) => handlePricingChoiceClick(event, plan.code)}
                   >
                     {plan.cta}
                   </a>

@@ -1,0 +1,180 @@
+import { randomUUID } from 'node:crypto';
+import { env } from '../config/env.js';
+import { HttpError } from './httpError.js';
+
+let cachedAccessToken = null;
+let cachedAccessTokenExpiresAt = 0;
+
+function ensurePayPalConfigured() {
+  if (!env.isPayPalConfigured) {
+    throw new HttpError(
+      503,
+      'PAYPAL_NOT_CONFIGURED',
+      'PayPal integration is not configured on the server'
+    );
+  }
+}
+
+function formatPayPalError(payload, fallbackMessage) {
+  const details = [];
+
+  if (payload?.name) {
+    details.push(`name=${payload.name}`);
+  }
+
+  if (payload?.debug_id) {
+    details.push(`debug_id=${payload.debug_id}`);
+  }
+
+  if (Array.isArray(payload?.details) && payload.details.length > 0) {
+    const firstIssue = payload.details[0];
+
+    if (firstIssue?.issue) {
+      details.push(`issue=${firstIssue.issue}`);
+    }
+
+    if (firstIssue?.description) {
+      details.push(firstIssue.description);
+    }
+  }
+
+  return {
+    message: payload?.message || fallbackMessage,
+    details,
+  };
+}
+
+async function fetchPayPalAccessToken() {
+  ensurePayPalConfigured();
+
+  const now = Date.now();
+
+  if (cachedAccessToken && cachedAccessTokenExpiresAt - 30_000 > now) {
+    return cachedAccessToken;
+  }
+
+  const basicAuth = Buffer.from(
+    `${env.paypalClientId}:${env.paypalClientSecret}`
+  ).toString('base64');
+
+  const response = await fetch(`${env.paypalApiBase}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok || !payload?.access_token) {
+    const parsed = formatPayPalError(payload, 'Unable to authenticate with PayPal');
+
+    throw new HttpError(502, 'PAYPAL_AUTH_FAILED', parsed.message, parsed.details);
+  }
+
+  const expiresInSeconds = Number(payload.expires_in || 0);
+  cachedAccessToken = payload.access_token;
+  cachedAccessTokenExpiresAt = now + Math.max(30_000, expiresInSeconds * 1000);
+
+  return cachedAccessToken;
+}
+
+async function paypalApiRequest(path, { method = 'GET', body, requestId } = {}) {
+  const accessToken = await fetchPayPalAccessToken();
+
+  const response = await fetch(`${env.paypalApiBase}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'PayPal-Request-Id': requestId || randomUUID(),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const parsed = formatPayPalError(payload, 'PayPal request failed');
+
+    throw new HttpError(502, 'PAYPAL_API_ERROR', parsed.message, parsed.details);
+  }
+
+  return payload;
+}
+
+export async function createPayPalOrder({
+  amountCents,
+  currencyCode = 'EUR',
+  description,
+  customId,
+}) {
+  if (!Number.isInteger(amountCents) || amountCents <= 0) {
+    throw new HttpError(
+      400,
+      'PAYPAL_ORDER_INVALID_AMOUNT',
+      'amountCents must be a positive integer'
+    );
+  }
+
+  const normalizedCurrencyCode = String(currencyCode || 'EUR').toUpperCase();
+  const orderAmount = (amountCents / 100).toFixed(2);
+
+  const payload = await paypalApiRequest('/v2/checkout/orders', {
+    method: 'POST',
+    body: {
+      intent: 'CAPTURE',
+      purchase_units: [
+        {
+          custom_id: customId,
+          description,
+          amount: {
+            currency_code: normalizedCurrencyCode,
+            value: orderAmount,
+          },
+        },
+      ],
+      application_context: {
+        brand_name: 'StockPro',
+        shipping_preference: 'NO_SHIPPING',
+        user_action: 'PAY_NOW',
+      },
+    },
+  });
+
+  const approveLink = Array.isArray(payload?.links)
+    ? payload.links.find((link) => link?.rel === 'approve')?.href || null
+    : null;
+
+  return {
+    id: payload?.id || null,
+    status: payload?.status || null,
+    approveLink,
+    raw: payload,
+  };
+}
+
+export async function capturePayPalOrder(orderId) {
+  const normalizedOrderId = String(orderId || '').trim();
+
+  if (!normalizedOrderId) {
+    throw new HttpError(400, 'PAYPAL_ORDER_ID_REQUIRED', 'orderId is required');
+  }
+
+  const payload = await paypalApiRequest(
+    `/v2/checkout/orders/${encodeURIComponent(normalizedOrderId)}/capture`,
+    {
+      method: 'POST',
+      body: {},
+      requestId: normalizedOrderId,
+    }
+  );
+
+  return {
+    id: payload?.id || normalizedOrderId,
+    status: payload?.status || null,
+    raw: payload,
+  };
+}

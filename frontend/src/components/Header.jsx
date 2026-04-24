@@ -344,7 +344,7 @@ export default function Header({ showNav = true, isDashboard = false }) {
   };
 
   const showLandingNavigation = showNav && !isDashboard;
-  const isCompactHeader = !showLandingNavigation && !isDashboard;
+  const isCompactHeader = !showLandingNavigation;
   const isLoggedIn = Boolean(session?.accessToken && session?.user?.email);
   const dashboardPath = getDashboardPathForRole(session?.user?.role || session?.role || 'employee');
   const logoSrc = theme === 'dark' ? whiteLogo : blackLogo;
@@ -443,7 +443,7 @@ export default function Header({ showNav = true, isDashboard = false }) {
         </div>
       )}
 
-      <div className={`header-content${showLandingNavigation ? ' has-nav' : ''}${!showLandingNavigation && !isDashboard ? ' no-nav' : ''}`}>
+      <div className={`header-content${showLandingNavigation ? ' has-nav' : ' no-nav'}`}>
         {showLandingNavigation && (
           <nav className="nav-links">
             <div className="audience-menu" ref={audienceMenuRef}>

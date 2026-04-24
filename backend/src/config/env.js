@@ -31,6 +31,30 @@ function readRequired(name) {
   return value;
 }
 
+function parsePayPalEnvironment(rawValue) {
+  const normalized = String(rawValue || 'sandbox').trim().toLowerCase();
+
+  if (normalized !== 'sandbox' && normalized !== 'live') {
+    throw new Error(
+      `Invalid PAYPAL_ENVIRONMENT: expected "sandbox" or "live", got "${rawValue}"`
+    );
+  }
+
+  return normalized;
+}
+
+function resolvePayPalApiBase(environment, overrideBase) {
+  const normalizedOverride = String(overrideBase || '').trim();
+
+  if (normalizedOverride) {
+    return normalizedOverride.replace(/\/+$/, '');
+  }
+
+  return environment === 'live'
+    ? 'https://api-m.paypal.com'
+    : 'https://api-m.sandbox.paypal.com';
+}
+
 export function validateEnvironment() {
   const missing = REQUIRED_ENV_VARS.filter((name) => {
     const value = process.env[name];
@@ -57,9 +81,26 @@ export function validateEnvironment() {
   parseInteger('AUTH_RATE_LIMIT_REGISTER_MAX', 5, 1);
   parseInteger('AUTH_RATE_LIMIT_REFRESH_WINDOW_MS', 60000, 1000);
   parseInteger('AUTH_RATE_LIMIT_REFRESH_MAX', 20, 1);
+
+  const paypalClientId = String(process.env.PAYPAL_CLIENT_ID || '').trim();
+  const paypalClientSecret = String(process.env.PAYPAL_CLIENT_SECRET || '').trim();
+
+  if ((paypalClientId && !paypalClientSecret) || (!paypalClientId && paypalClientSecret)) {
+    throw new Error(
+      'PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET must both be set together'
+    );
+  }
+
+  parsePayPalEnvironment(process.env.PAYPAL_ENVIRONMENT || 'sandbox');
 }
 
 validateEnvironment();
+
+const paypalEnvironment = parsePayPalEnvironment(
+  process.env.PAYPAL_ENVIRONMENT || 'sandbox'
+);
+const paypalClientId = String(process.env.PAYPAL_CLIENT_ID || '').trim();
+const paypalClientSecret = String(process.env.PAYPAL_CLIENT_SECRET || '').trim();
 
 export const env = {
   port: parseInteger('PORT', 5000, 1),
@@ -102,4 +143,12 @@ export const env = {
     1000
   ),
   authRateLimitRefreshMax: parseInteger('AUTH_RATE_LIMIT_REFRESH_MAX', 20, 1),
+  paypalEnvironment,
+  paypalClientId,
+  paypalClientSecret,
+  paypalApiBase: resolvePayPalApiBase(
+    paypalEnvironment,
+    process.env.PAYPAL_API_BASE_URL
+  ),
+  isPayPalConfigured: Boolean(paypalClientId && paypalClientSecret),
 };

@@ -334,11 +334,11 @@ router.post('/register', registerRateLimiter, async (request, response, next) =>
       );
     }
 
-    if (role !== 'employee' && role !== 'company_admin') {
+    if (role !== 'employee') {
       throw new HttpError(
         400,
         'AUTH_VALIDATION_ERROR',
-        'role must be either employee or company_admin'
+        'role must be employee. Company admin accounts must be created from paid subscription checkout.'
       );
     }
 

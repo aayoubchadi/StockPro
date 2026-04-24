@@ -78,6 +78,9 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code VARCHAR(50) NOT NULL UNIQUE,
   name VARCHAR(120) NOT NULL,
+  monthly_price_cents INTEGER NOT NULL DEFAULT 0 CHECK (monthly_price_cents >= 0),
+  currency_code CHAR(3) NOT NULL DEFAULT 'EUR',
+  paypal_plan_reference VARCHAR(120),
   max_employees INTEGER NOT NULL CHECK (max_employees BETWEEN 20 AND 150),
   can_export_reports BOOLEAN NOT NULL DEFAULT FALSE,
   can_use_advanced_analytics BOOLEAN NOT NULL DEFAULT FALSE,
@@ -94,6 +97,59 @@ CREATE TABLE IF NOT EXISTS companies (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- One paid subscription record per company can be active at a time.
+-- Provider payload is stored for auditability and dispute handling.
+CREATE TABLE IF NOT EXISTS company_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  subscription_plan_id UUID NOT NULL REFERENCES subscription_plans(id),
+  provider VARCHAR(20) NOT NULL DEFAULT 'paypal',
+  provider_order_id VARCHAR(120) NOT NULL UNIQUE,
+  status VARCHAR(30) NOT NULL DEFAULT 'active',
+  amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+  currency_code CHAR(3) NOT NULL DEFAULT 'EUR',
+  payer_email CITEXT,
+  raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  starts_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ends_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT ck_company_subscriptions_provider CHECK (provider IN ('paypal')),
+  CONSTRAINT ck_company_subscriptions_status CHECK (
+    status IN ('pending', 'active', 'canceled', 'expired')
+  )
+);
+
+ALTER TABLE subscription_plans
+  ADD COLUMN IF NOT EXISTS monthly_price_cents INTEGER,
+  ADD COLUMN IF NOT EXISTS currency_code CHAR(3),
+  ADD COLUMN IF NOT EXISTS paypal_plan_reference VARCHAR(120);
+
+UPDATE subscription_plans
+SET
+  monthly_price_cents = COALESCE(monthly_price_cents, 0),
+  currency_code = COALESCE(NULLIF(UPPER(currency_code), ''), 'EUR');
+
+ALTER TABLE subscription_plans
+  ALTER COLUMN monthly_price_cents SET DEFAULT 0,
+  ALTER COLUMN monthly_price_cents SET NOT NULL,
+  ALTER COLUMN currency_code SET DEFAULT 'EUR',
+  ALTER COLUMN currency_code SET NOT NULL;
+
+ALTER TABLE company_subscriptions
+  ADD COLUMN IF NOT EXISTS raw_payload JSONB;
+
+UPDATE company_subscriptions
+SET
+  raw_payload = COALESCE(raw_payload, '{}'::jsonb),
+  currency_code = COALESCE(NULLIF(UPPER(currency_code), ''), 'EUR');
+
+ALTER TABLE company_subscriptions
+  ALTER COLUMN raw_payload SET DEFAULT '{}'::jsonb,
+  ALTER COLUMN raw_payload SET NOT NULL,
+  ALTER COLUMN currency_code SET DEFAULT 'EUR',
+  ALTER COLUMN currency_code SET NOT NULL;
 
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -334,6 +390,43 @@ BEGIN
       USING email::citext;
     END IF;
   END IF;
+
+  IF to_regclass('public.company_subscriptions') IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'company_subscriptions'
+        AND column_name = 'payer_email'
+        AND udt_name <> 'citext'
+    ) THEN
+      ALTER TABLE public.company_subscriptions
+      ALTER COLUMN payer_email TYPE CITEXT
+      USING payer_email::citext;
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'company_subscriptions'
+        AND column_name = 'currency_code'
+    ) THEN
+      UPDATE public.company_subscriptions
+      SET currency_code = COALESCE(NULLIF(UPPER(currency_code), ''), 'EUR');
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'subscription_plans'
+        AND column_name = 'currency_code'
+    ) THEN
+      UPDATE public.subscription_plans
+      SET currency_code = COALESCE(NULLIF(UPPER(currency_code), ''), 'EUR');
+    END IF;
+  END IF;
 END
 $$;
 
@@ -388,6 +481,11 @@ FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 DROP TRIGGER IF EXISTS trg_companies_updated_at ON companies;
 CREATE TRIGGER trg_companies_updated_at
 BEFORE UPDATE ON companies
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_company_subscriptions_updated_at ON company_subscriptions;
+CREATE TRIGGER trg_company_subscriptions_updated_at
+BEFORE UPDATE ON company_subscriptions
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 DROP TRIGGER IF EXISTS trg_platform_admins_updated_at ON platform_admins;
@@ -446,6 +544,10 @@ FOR EACH ROW EXECUTE FUNCTION enforce_employee_limit();
 CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);
 CREATE INDEX IF NOT EXISTS idx_users_company_role ON users(company_id, role);
 CREATE INDEX IF NOT EXISTS idx_users_company_active ON users(company_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_companies_subscription_plan_id ON companies(subscription_plan_id);
+CREATE INDEX IF NOT EXISTS idx_company_subscriptions_company_status ON company_subscriptions(company_id, status);
+CREATE INDEX IF NOT EXISTS idx_company_subscriptions_plan_status ON company_subscriptions(subscription_plan_id, status);
+CREATE INDEX IF NOT EXISTS idx_company_subscriptions_created_at ON company_subscriptions(created_at);
 CREATE INDEX IF NOT EXISTS idx_products_company_name ON products(company_id, name);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_company_product ON stock_movements(company_id, product_id);
 CREATE INDEX IF NOT EXISTS idx_stock_movements_created_at ON stock_movements(created_at);
@@ -458,23 +560,39 @@ CREATE INDEX IF NOT EXISTS idx_auth_blacklist_expires_at ON auth_access_token_bl
 CREATE INDEX IF NOT EXISTS idx_auth_audit_events_created_at ON auth_audit_events(created_at);
 CREATE INDEX IF NOT EXISTS idx_auth_audit_events_type_created ON auth_audit_events(event_type, created_at);
 CREATE INDEX IF NOT EXISTS idx_auth_audit_events_principal ON auth_audit_events(principal_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_company_subscriptions_one_active_per_company
+  ON company_subscriptions(company_id)
+  WHERE status = 'active';
 
 -- Row level security ensures each session can only access its company data.
 -- The backend must execute: SET app.current_company_id = '<company_uuid>' per request/session.
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE company_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE stock_movements ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS companies_isolation_policy ON companies;
 CREATE POLICY companies_isolation_policy ON companies
-USING (id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID)
-WITH CHECK (id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID);
+USING (
+  id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID
+  OR NULLIF(current_setting('app.current_scope', TRUE), '') = 'platform'
+)
+WITH CHECK (
+  id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID
+  OR NULLIF(current_setting('app.current_scope', TRUE), '') = 'platform'
+);
 
 DROP POLICY IF EXISTS users_isolation_policy ON users;
 CREATE POLICY users_isolation_policy ON users
-USING (company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID)
-WITH CHECK (company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID);
+USING (
+  company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID
+  OR NULLIF(current_setting('app.current_scope', TRUE), '') = 'platform'
+)
+WITH CHECK (
+  company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID
+  OR NULLIF(current_setting('app.current_scope', TRUE), '') = 'platform'
+);
 
 DROP POLICY IF EXISTS users_auth_email_lookup_policy ON users;
 CREATE POLICY users_auth_email_lookup_policy ON users
@@ -484,12 +602,35 @@ USING (
   AND email = NULLIF(current_setting('app.auth_email', true), '')::CITEXT
 );
 
+DROP POLICY IF EXISTS company_subscriptions_isolation_policy ON company_subscriptions;
+CREATE POLICY company_subscriptions_isolation_policy ON company_subscriptions
+USING (
+  company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID
+  OR NULLIF(current_setting('app.current_scope', TRUE), '') = 'platform'
+)
+WITH CHECK (
+  company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID
+  OR NULLIF(current_setting('app.current_scope', TRUE), '') = 'platform'
+);
+
 DROP POLICY IF EXISTS products_isolation_policy ON products;
 CREATE POLICY products_isolation_policy ON products
-USING (company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID)
-WITH CHECK (company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID);
+USING (
+  company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID
+  OR NULLIF(current_setting('app.current_scope', TRUE), '') = 'platform'
+)
+WITH CHECK (
+  company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID
+  OR NULLIF(current_setting('app.current_scope', TRUE), '') = 'platform'
+);
 
 DROP POLICY IF EXISTS stock_movements_isolation_policy ON stock_movements;
 CREATE POLICY stock_movements_isolation_policy ON stock_movements
-USING (company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID)
-WITH CHECK (company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID);
+USING (
+  company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID
+  OR NULLIF(current_setting('app.current_scope', TRUE), '') = 'platform'
+)
+WITH CHECK (
+  company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::UUID
+  OR NULLIF(current_setting('app.current_scope', TRUE), '') = 'platform'
+);
