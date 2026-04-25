@@ -9,12 +9,18 @@ Scope: Backend PostgreSQL user model for tenant and platform access
 1. `companies`
 - Tenant root entity.
 - Every tenant-scoped user belongs to exactly one company.
+- Demo support:
+  - `is_demo` indicates demo tenants.
+  - `demo_expires_at` marks the hard expiry date/time.
 
 2. `users` (tenant-scoped)
 - Represents company accounts.
 - Must always include `company_id`.
 - Primary key: `id`.
 - Tenant boundary: all reads/writes are scoped by `company_id` and RLS (`app.current_company_id`).
+- Permission model:
+  - Per-user `permissions` JSON object stores employee privilege flags.
+  - `company_admin` keeps full in-company access by rule.
 
 3. `platform_admins` (global, non-tenant)
 - Represents platform-level operators.
@@ -30,6 +36,7 @@ Tenant roles are constrained by enum `account_role`:
 Role rules:
 - At most one active `company_admin` per company.
 - Any number of `employee` users per company, limited by subscription plan trigger (`enforce_employee_limit`).
+- Employee privileges are explicit and persisted in `users.permissions`.
 
 ## 3. Status flags
 
@@ -77,3 +84,4 @@ Required migration behavior:
 - Soft delete fields.
 - Platform admins mixed into tenant `users` table.
 - Historical role assignment audit tables.
+- Cross-company shared demo tenants.

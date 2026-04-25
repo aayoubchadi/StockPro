@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getSession, clearSession, getDashboardPathForRole, getSessionChangeEventName } from '../lib/authStore';
+import {
+  getSession,
+  clearSession,
+  getSessionChangeEventName,
+  getWorkspaceMenuForSession,
+} from '../lib/authStore';
 import { logoutRequest } from '../services/authApi';
 import blackLogo from '../assets/images/black-v.png';
 import whiteLogo from '../assets/images/white-v.png';
@@ -343,10 +348,12 @@ export default function Header({ showNav = true, isDashboard = false }) {
     navigate(path);
   };
 
-  const showLandingNavigation = showNav && !isDashboard;
-  const isCompactHeader = !showLandingNavigation;
   const isLoggedIn = Boolean(session?.accessToken && session?.user?.email);
-  const dashboardPath = getDashboardPathForRole(session?.user?.role || session?.role || 'employee');
+  const showLandingNavigation = showNav && !isDashboard && !isLoggedIn;
+  const showWorkspaceNavigation = isLoggedIn && (isDashboard || showNav);
+  const hasNavigation = showLandingNavigation || showWorkspaceNavigation;
+  const isCompactHeader = !hasNavigation;
+  const workspaceMenu = getWorkspaceMenuForSession(session);
   const logoSrc = theme === 'dark' ? whiteLogo : blackLogo;
   const nextThemeLabel = theme === 'dark' ? t('header.theme.toLight') : t('header.theme.toDark');
   const languageFlags = {
@@ -372,12 +379,12 @@ export default function Header({ showNav = true, isDashboard = false }) {
   };
 
   return (
-    <header className={`site-header${showLandingNavigation && isMobileMenuOpen ? ' is-mobile-open' : ''}${isCompactHeader ? ' is-compact' : ''}`} ref={headerRef}>
+    <header className={`site-header${hasNavigation && isMobileMenuOpen ? ' is-mobile-open' : ''}${isCompactHeader ? ' is-compact' : ''}`} ref={headerRef}>
       <Link to="/" className="brand" onClick={handleLogoClick}>
         <img src={logoSrc} alt="StockPro" className="site-logo" />
       </Link>
 
-      {showLandingNavigation && (
+      {hasNavigation && (
         <div className="header-top-controls">
           <button
             className="btn btn-ghost theme-toggle mobile-theme-toggle"
@@ -443,7 +450,7 @@ export default function Header({ showNav = true, isDashboard = false }) {
         </div>
       )}
 
-      <div className={`header-content${showLandingNavigation ? ' has-nav' : ' no-nav'}`}>
+      <div className={`header-content${hasNavigation ? ' has-nav' : ' no-nav'}`}>
         {showLandingNavigation && (
           <nav className="nav-links">
             <div className="audience-menu" ref={audienceMenuRef}>
@@ -519,6 +526,21 @@ export default function Header({ showNav = true, isDashboard = false }) {
                 </div>
               )}
             </div>
+          </nav>
+        )}
+
+        {showWorkspaceNavigation && (
+          <nav className="nav-links">
+            {workspaceMenu.map((item) => (
+              <Link
+                key={item.key}
+                to={item.path}
+                onClick={handleNavClick}
+                className={location.pathname === item.path ? 'active' : ''}
+              >
+                {item.labelKey ? t(item.labelKey) : item.label}
+              </Link>
+            ))}
           </nav>
         )}
 
@@ -607,28 +629,16 @@ export default function Header({ showNav = true, isDashboard = false }) {
             )}
           </button>
 
-          {isDashboard ? (
-            <>
-              <Link to="/" className="btn btn-ghost" onClick={handleNavClick}>{t('header.actions.home')}</Link>
-              <button onClick={handleLogout} className="btn btn-secondary" type="button">
-                {t('header.actions.logout')}
-              </button>
-            </>
+          {isLoggedIn ? (
+            <button onClick={handleLogout} className="btn btn-secondary" type="button">
+              {t('header.actions.logout')}
+            </button>
           ) : (
             showLandingNavigation && (
-              isLoggedIn ? (
-                <>
-                  <Link to={dashboardPath} className="btn btn-ghost" onClick={handleNavClick}>Dashboard</Link>
-                  <button onClick={handleLogout} className="btn btn-secondary" type="button">
-                    {t('header.actions.logout')}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link to="/login" className="btn btn-ghost" onClick={handleNavClick}>{t('header.actions.login')}</Link>
-                  <a href="#pricing" className="btn btn-secondary" onClick={handleNavClick}>{t('header.actions.startTrial')}</a>
-                </>
-              )
+              <>
+                <Link to="/login" className="btn btn-ghost" onClick={handleNavClick}>{t('header.actions.login')}</Link>
+                <a href="#pricing" className="btn btn-secondary" onClick={handleNavClick}>{t('header.actions.startTrial')}</a>
+              </>
             )
           )}
         </div>

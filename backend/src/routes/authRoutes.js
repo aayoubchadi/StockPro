@@ -22,6 +22,11 @@ import {
 import { generateRefreshToken, hashRefreshToken } from '../lib/refreshToken.js';
 import { blacklistAccessToken } from '../lib/accessTokenBlacklist.js';
 import { logAuthEvent } from '../lib/authAudit.js';
+import {
+  extractEnabledPermissions,
+  resolveEffectivePermissions,
+} from '../lib/permissions.js';
+import { loadTenantContext } from '../lib/tenantContext.js';
 
 const router = Router();
 
@@ -55,6 +60,49 @@ function tokenExpToDate(exp) {
   }
 
   return new Date(value * 1000);
+}
+
+function isDemoExpired(demoExpiresAt) {
+  if (!demoExpiresAt) {
+    return false;
+  }
+
+  return new Date(demoExpiresAt).getTime() <= Date.now();
+}
+
+function buildTenantUserPayload(user) {
+  const effectivePermissions = resolveEffectivePermissions(
+    user.role,
+    user.permissions || {}
+  );
+
+  return {
+    id: user.id,
+    companyId: user.company_id,
+    companySlug: user.company_slug,
+    fullName: user.full_name,
+    email: user.email,
+    role: user.role,
+    scope: 'tenant',
+    permissions: user.permissions || {},
+    effectivePermissions,
+    effectivePermissionList: extractEnabledPermissions(effectivePermissions),
+    company: {
+      id: user.company_id,
+      slug: user.company_slug,
+      name: user.company_name,
+      isDemo: Boolean(user.company_is_demo),
+      demoExpiresAt: user.company_demo_expires_at,
+    },
+    plan: {
+      code: user.plan_code,
+      name: user.plan_name,
+      maxEmployees: Number(user.plan_max_employees || 0),
+      canExportReports: Boolean(user.plan_can_export_reports),
+      canUseAdvancedAnalytics: Boolean(user.plan_can_use_advanced_analytics),
+      currencyCode: String(user.plan_currency_code || 'EUR').toUpperCase(),
+    },
+  };
 }
 
 async function issueSessionTokens({
@@ -286,13 +334,17 @@ async function verifyGoogleIdToken(idToken) {
 async function findTenantUserByEmailInCompany(companyId, email) {
   const { rows } = await runWithCompanyScope(companyId, (client) =>
     client.query(
-      `SELECT
+       `SELECT
          u.id,
          u.company_id,
          c.slug AS company_slug,
+         c.name AS company_name,
+         c.is_demo AS company_is_demo,
+         c.demo_expires_at AS company_demo_expires_at,
          u.full_name,
          u.email::text AS email,
          u.role,
+         u.permissions,
          u.is_active
        FROM users u
        JOIN companies c ON c.id = u.company_id
@@ -310,6 +362,12 @@ router.post('/register', registerRateLimiter, async (request, response, next) =>
   let resolvedCompanyId = null;
 
   try {
+    throw new HttpError(
+      403,
+      'AUTH_PUBLIC_SIGNUP_DISABLED',
+      'Public employee sign-up is disabled. Employees must be created by a company admin.'
+    );
+
     const companyId = normalizeValue(request.body.companyId);
     const fullName = normalizeValue(request.body.fullName);
     const email = normalizeEmail(request.body.email);
@@ -617,13 +675,24 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
              u.id,
              u.company_id,
              c.slug AS company_slug,
+             c.name AS company_name,
+             c.is_demo AS company_is_demo,
+             c.demo_expires_at AS company_demo_expires_at,
              u.full_name,
              u.email::text AS email,
              u.password_hash,
              u.role,
+             u.permissions,
              u.is_active
+             ,sp.code AS plan_code
+             ,sp.name AS plan_name
+             ,sp.max_employees AS plan_max_employees
+             ,sp.can_export_reports AS plan_can_export_reports
+             ,sp.can_use_advanced_analytics AS plan_can_use_advanced_analytics
+             ,sp.currency_code AS plan_currency_code
            FROM users u
            JOIN companies c ON c.id = u.company_id
+           JOIN subscription_plans sp ON sp.id = c.subscription_plan_id
            WHERE u.email = $1
              AND u.company_id = $2
            LIMIT 2`,
@@ -643,6 +712,14 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
 
       if (!user.is_active) {
         throw new HttpError(403, 'AUTH_ACCOUNT_DISABLED', 'Account is disabled');
+      }
+
+      if (Boolean(user.company_is_demo) && isDemoExpired(user.company_demo_expires_at)) {
+        throw new HttpError(
+          403,
+          'DEMO_EXPIRED',
+          'This demo workspace has expired. Please upgrade to a paid plan.'
+        );
       }
 
       const matches = await bcrypt.compare(password, user.password_hash);
@@ -672,15 +749,7 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
           expiresIn: env.jwtAccessTtlSeconds,
           refreshToken: tokens.refreshToken,
           refreshExpiresIn: env.jwtRefreshTtlSeconds,
-          user: {
-            id: user.id,
-            companyId: user.company_id,
-            companySlug: user.company_slug,
-            fullName: user.full_name,
-            email: user.email,
-            role: user.role,
-            scope: 'tenant',
-          },
+          user: buildTenantUserPayload(user),
         },
       });
 
@@ -839,12 +908,23 @@ router.post('/login/google', loginRateLimiter, async (request, response, next) =
              u.id,
              u.company_id,
              c.slug AS company_slug,
+             c.name AS company_name,
+             c.is_demo AS company_is_demo,
+             c.demo_expires_at AS company_demo_expires_at,
              u.full_name,
              u.email::text AS email,
              u.role,
+             u.permissions,
              u.is_active
+             ,sp.code AS plan_code
+             ,sp.name AS plan_name
+             ,sp.max_employees AS plan_max_employees
+             ,sp.can_export_reports AS plan_can_export_reports
+             ,sp.can_use_advanced_analytics AS plan_can_use_advanced_analytics
+             ,sp.currency_code AS plan_currency_code
            FROM users u
            JOIN companies c ON c.id = u.company_id
+           JOIN subscription_plans sp ON sp.id = c.subscription_plan_id
            WHERE u.email = $1
              AND u.company_id = $2
            LIMIT 2`,
@@ -866,6 +946,14 @@ router.post('/login/google', loginRateLimiter, async (request, response, next) =
         throw new HttpError(403, 'AUTH_ACCOUNT_DISABLED', 'Account is disabled');
       }
 
+      if (Boolean(user.company_is_demo) && isDemoExpired(user.company_demo_expires_at)) {
+        throw new HttpError(
+          403,
+          'DEMO_EXPIRED',
+          'This demo workspace has expired. Please upgrade to a paid plan.'
+        );
+      }
+
       const tokens = await issueSessionTokens({
         principalId: user.id,
         scope: 'tenant',
@@ -883,15 +971,7 @@ router.post('/login/google', loginRateLimiter, async (request, response, next) =
           expiresIn: env.jwtAccessTtlSeconds,
           refreshToken: tokens.refreshToken,
           refreshExpiresIn: env.jwtRefreshTtlSeconds,
-          user: {
-            id: user.id,
-            companyId: user.company_id,
-            companySlug: user.company_slug,
-            fullName: user.full_name,
-            email: user.email,
-            role: user.role,
-            scope: 'tenant',
-          },
+          user: buildTenantUserPayload(user),
         },
       });
 
@@ -937,6 +1017,12 @@ router.post('/register/google', registerRateLimiter, async (request, response, n
   let resolvedCompanyId = null;
 
   try {
+    throw new HttpError(
+      403,
+      'AUTH_PUBLIC_SIGNUP_DISABLED',
+      'Public employee sign-up is disabled. Employees must be created by a company admin.'
+    );
+
     const googleIdentity = await verifyGoogleIdToken(request.body.idToken);
     const email = googleIdentity.email;
     const requestedCompanyId = normalizeValue(request.body.companyId);
@@ -1212,6 +1298,15 @@ router.post('/logout', requireAuth, async (request, response, next) => {
 
 router.get('/me', requireAuth, async (request, response, next) => {
   try {
+    let tenantContext = null;
+
+    if (request.auth.scope === 'tenant' && request.auth.companyId) {
+      tenantContext = await loadTenantContext({
+        companyId: request.auth.companyId,
+        userId: request.auth.userId,
+      });
+    }
+
     response.json({
       data: {
         auth: {
@@ -1222,6 +1317,7 @@ router.get('/me', requireAuth, async (request, response, next) => {
           companyId: request.auth.companyId,
           email: request.auth.email,
         },
+        tenantContext,
       },
     });
   } catch (error) {

@@ -79,6 +79,10 @@ Validation error payload example:
 Endpoint:
 - `POST /api/v1/auth/register`
 
+Status:
+- Public tenant self-signup is disabled in production flow.
+- Endpoint returns `403 AUTH_PUBLIC_SIGNUP_DISABLED`.
+
 Request body:
 
 ```json
@@ -160,7 +164,10 @@ Success response:
       "fullName": "Jane Doe",
       "email": "jane@acme.com",
       "role": "employee",
-      "scope": "tenant"
+      "scope": "tenant",
+      "permissions": {},
+      "effectivePermissions": {},
+      "effectivePermissionList": []
     }
   }
 }
@@ -170,6 +177,7 @@ Failure cases:
 - `400` with `AUTH_VALIDATION_ERROR`
 - `401` with `AUTH_INVALID_CREDENTIALS`
 - `403` with `AUTH_ACCOUNT_DISABLED`
+- `403` with `DEMO_EXPIRED` for expired demo tenants
 - `429` with `AUTH_RATE_LIMITED`
 
 ## 7. Access token contract (JWT claims)

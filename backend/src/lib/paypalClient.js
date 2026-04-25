@@ -123,6 +123,7 @@ export async function createPayPalOrder({
   currencyCode = 'EUR',
   description,
   customId,
+  intent = 'CAPTURE',
 }) {
   if (!Number.isInteger(amountCents) || amountCents <= 0) {
     throw new HttpError(
@@ -132,13 +133,22 @@ export async function createPayPalOrder({
     );
   }
 
+  const normalizedIntent = String(intent || 'CAPTURE').toUpperCase();
+  if (normalizedIntent !== 'CAPTURE' && normalizedIntent !== 'AUTHORIZE') {
+    throw new HttpError(
+      400,
+      'PAYPAL_ORDER_INVALID_INTENT',
+      'intent must be CAPTURE or AUTHORIZE'
+    );
+  }
+
   const normalizedCurrencyCode = String(currencyCode || 'EUR').toUpperCase();
   const orderAmount = (amountCents / 100).toFixed(2);
 
   const payload = await paypalApiRequest('/v2/checkout/orders', {
     method: 'POST',
     body: {
-      intent: 'CAPTURE',
+      intent: normalizedIntent,
       purchase_units: [
         {
           custom_id: customId,
@@ -165,6 +175,78 @@ export async function createPayPalOrder({
     id: payload?.id || null,
     status: payload?.status || null,
     approveLink,
+    raw: payload,
+  };
+}
+
+export async function authorizePayPalOrder(orderId) {
+  const normalizedOrderId = String(orderId || '').trim();
+
+  if (!normalizedOrderId) {
+    throw new HttpError(400, 'PAYPAL_ORDER_ID_REQUIRED', 'orderId is required');
+  }
+
+  const payload = await paypalApiRequest(
+    `/v2/checkout/orders/${encodeURIComponent(normalizedOrderId)}/authorize`,
+    {
+      method: 'POST',
+      body: {},
+      requestId: normalizedOrderId,
+    }
+  );
+
+  return {
+    id: payload?.id || normalizedOrderId,
+    status: payload?.status || null,
+    raw: payload,
+  };
+}
+
+export async function voidPayPalAuthorization(authorizationId) {
+  const normalizedAuthorizationId = String(authorizationId || '').trim();
+
+  if (!normalizedAuthorizationId) {
+    throw new HttpError(
+      400,
+      'PAYPAL_AUTHORIZATION_ID_REQUIRED',
+      'authorizationId is required'
+    );
+  }
+
+  const accessToken = await fetchPayPalAccessToken();
+
+  const response = await fetch(
+    `${env.paypalApiBase}/v2/payments/authorizations/${encodeURIComponent(
+      normalizedAuthorizationId
+    )}/void`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'PayPal-Request-Id': randomUUID(),
+      },
+      body: '{}',
+    }
+  );
+
+  if (response.status === 204) {
+    return {
+      status: 'VOIDED',
+      raw: null,
+    };
+  }
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const parsed = formatPayPalError(payload, 'Failed to void PayPal authorization');
+
+    throw new HttpError(502, 'PAYPAL_API_ERROR', parsed.message, parsed.details);
+  }
+
+  return {
+    status: payload?.status || 'VOIDED',
     raw: payload,
   };
 }

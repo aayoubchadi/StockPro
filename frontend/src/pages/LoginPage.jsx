@@ -37,6 +37,10 @@ export default function LoginPage() {
         role: data.user?.role || 'employee',
         scope: data.user?.scope || 'tenant',
         companyId: data.user?.companyId || null,
+        permissions: data.user?.permissions || {},
+        effectivePermissions: data.user?.effectivePermissions || {},
+        company: data.user?.company || null,
+        plan: data.user?.plan || null,
       });
 
       const role = data.user?.role || 'employee';

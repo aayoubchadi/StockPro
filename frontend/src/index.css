@@ -3308,14 +3308,23 @@ main#top.contact-page>.section+.section {
   font-weight: 700;
 }
 
-.checkout-form input {
+.checkout-form input,
+.checkout-form select,
+.checkout-form textarea {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 11px 12px;
   font: inherit;
 }
 
-.checkout-form input:focus {
+.checkout-form textarea {
+  min-height: 128px;
+  resize: vertical;
+}
+
+.checkout-form input:focus,
+.checkout-form select:focus,
+.checkout-form textarea:focus {
   outline: 2px solid rgba(47, 102, 255, 0.2);
   border-color: var(--brand-500);
 }
@@ -4541,6 +4550,8 @@ main#top.contact-page>.section+.section {
 :root[data-theme='dark'] .checkout-wrap,
 :root[data-theme='dark'] .checkout-panel,
 :root[data-theme='dark'] .checkout-form input,
+:root[data-theme='dark'] .checkout-form select,
+:root[data-theme='dark'] .checkout-form textarea,
 :root[data-theme='dark'] .checkout-plan-option,
 :root[data-theme='dark'] .checkout-summary-row,
 :root[data-theme='dark'] .dashboard-list li {

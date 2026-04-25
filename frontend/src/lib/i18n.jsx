@@ -32,6 +32,13 @@ const translations = {
                 home: 'Home',
                 logout: 'Logout',
             },
+            workspace: {
+                dashboard: 'Dashboard',
+                teamAccess: 'Team & Access',
+                inventory: 'Inventory',
+                dataExchange: 'Data Exchange',
+                billing: 'Billing',
+            },
             theme: {
                 toLight: 'Switch to light mode',
                 toDark: 'Switch to dark mode',

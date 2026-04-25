@@ -425,6 +425,10 @@ export default function CompanyAdminCheckoutPage() {
             role: loginData.user?.role || 'company_admin',
             scope: loginData.user?.scope || 'tenant',
             companyId: loginData.user?.companyId || captured?.company?.id || null,
+            permissions: loginData.user?.permissions || {},
+            effectivePermissions: loginData.user?.effectivePermissions || {},
+            company: loginData.user?.company || captured?.company || null,
+            plan: loginData.user?.plan || null,
           });
 
           setMessage('Subscription activated. Redirecting to your admin dashboard...');

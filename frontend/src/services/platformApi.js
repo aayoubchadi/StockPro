@@ -174,3 +174,51 @@ export async function getDashboardOverview({ accessToken }) {
 
   return payload?.data;
 }
+
+export async function createDemoVerificationOrder() {
+  const { response, payload } = await fetchApiEndpoint('/api/v1/billing/demo/paypal/orders', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    throw new Error(resolveErrorMessage(payload, 'Unable to create demo verification order'));
+  }
+
+  return payload?.data;
+}
+
+export async function verifyDemoPayPalOrder({
+  orderId,
+  companyName,
+  companySlug,
+  adminFullName,
+  adminEmail,
+  adminPassword,
+}) {
+  const { response, payload } = await fetchApiEndpoint(
+    `/api/v1/billing/demo/paypal/orders/${encodeURIComponent(orderId)}/verify`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        companyName,
+        companySlug,
+        adminFullName,
+        adminEmail,
+        adminPassword,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(resolveErrorMessage(payload, 'Unable to verify demo checkout'));
+  }
+
+  return payload?.data;
+}

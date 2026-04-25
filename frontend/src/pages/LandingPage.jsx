@@ -249,6 +249,15 @@ export default function LandingPage() {
               <p className="lp-pricing-subnote">
                 Company admin account creation is secured through PayPal subscription checkout.
               </p>
+              <div className="hero-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => navigate('/demo-onboarding')}
+                >
+                  Start free demo
+                </button>
+              </div>
             </div>
           </div>
 
@@ -256,6 +265,37 @@ export default function LandingPage() {
           {isPricingLoading ? <p className="lp-pricing-loading">Loading subscription plans...</p> : null}
 
           <div className="lp-pricing-grid stagger-cards">
+            <article className="lp-plan-card feature-card">
+              <div className="lp-plan-head">
+                <h3>Demo Free</h3>
+                <p>14-day demo workspace with isolated tenant provisioning.</p>
+              </div>
+
+              <div className="lp-plan-price-wrap">
+                <p className="lp-plan-price">
+                  {formatPrice(0, 'USD')}
+                  <span> / {t('landing.pricing.perMonth')}</span>
+                </p>
+                <p className="lp-plan-unit">
+                  $1 temporary verification hold then immediate release
+                </p>
+              </div>
+
+              <ul className="lp-plan-list">
+                <li>Dedicated demo company workspace</li>
+                <li>Company admin access included</li>
+                <li>Automatic 14-day expiration</li>
+              </ul>
+
+              <button
+                type="button"
+                className="btn btn-secondary lp-plan-cta"
+                onClick={() => navigate('/demo-onboarding')}
+              >
+                Start free demo
+              </button>
+            </article>
+
             {pricingPlans.map((plan) => {
               const monthlyPriceCents = Number(plan.monthlyPriceCents || 0);
               const monthlyPrice = monthlyPriceCents / 100;

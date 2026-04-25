@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query, withDbClient } from '../lib/db.js';
 import { HttpError } from '../lib/httpError.js';
 import { requireAuth } from '../middleware/requireAuth.js';
+import { loadTenantContext } from '../lib/tenantContext.js';
 
 const router = Router();
 
@@ -405,10 +406,26 @@ router.get('/overview', requireAuth, async (request, response, next) => {
       throw new HttpError(400, 'DASHBOARD_COMPANY_REQUIRED', 'Company context is required');
     }
 
+    const tenantAccessContext = await loadTenantContext({
+      companyId: request.auth.companyId,
+      userId: request.auth.userId,
+    });
+
     const tenantOverview = await buildTenantOverview(request.auth.companyId);
 
     response.json({
-      data: tenantOverview,
+      data: {
+        ...tenantOverview,
+        authContext: {
+          role: tenantAccessContext.user.role,
+          permissions: tenantAccessContext.user.permissions,
+          effectivePermissions: tenantAccessContext.user.effectivePermissions,
+          effectivePermissionList: tenantAccessContext.user.effectivePermissionList,
+          company: tenantAccessContext.company,
+          plan: tenantAccessContext.plan,
+          capacity: tenantAccessContext.capacity,
+        },
+      },
     });
   } catch (error) {
     next(error);

@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS companies (
   name VARCHAR(180) NOT NULL UNIQUE,
   slug VARCHAR(120) NOT NULL UNIQUE,
   subscription_plan_id UUID NOT NULL REFERENCES subscription_plans(id),
+  is_demo BOOLEAN NOT NULL DEFAULT FALSE,
+  demo_expires_at TIMESTAMPTZ,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -158,13 +160,15 @@ CREATE TABLE IF NOT EXISTS users (
   email CITEXT NOT NULL,
   password_hash TEXT NOT NULL,
   role account_role NOT NULL DEFAULT 'employee',
+  permissions JSONB NOT NULL DEFAULT '{}'::jsonb,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT uq_users_company_email UNIQUE (company_id, email),
   CONSTRAINT uq_users_company_id_id UNIQUE (company_id, id),
   CONSTRAINT ck_users_email_not_blank CHECK (length(btrim(email::text)) > 0),
-  CONSTRAINT ck_users_full_name_not_blank CHECK (length(btrim(full_name)) > 0)
+  CONSTRAINT ck_users_full_name_not_blank CHECK (length(btrim(full_name)) > 0),
+  CONSTRAINT ck_users_permissions_is_object CHECK (jsonb_typeof(permissions) = 'object')
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_users_one_active_admin_per_company
@@ -227,6 +231,44 @@ CREATE TABLE IF NOT EXISTS auth_audit_events (
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS demo_verifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id VARCHAR(120) NOT NULL UNIQUE,
+  authorization_id VARCHAR(120),
+  status VARCHAR(30) NOT NULL DEFAULT 'pending',
+  company_id UUID REFERENCES companies(id) ON DELETE SET NULL,
+  admin_email CITEXT,
+  raw_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  verified_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT ck_demo_verifications_status CHECK (
+    status IN ('pending', 'authorized', 'voided', 'verified', 'failed')
+  )
+);
+
+ALTER TABLE companies
+  ADD COLUMN IF NOT EXISTS is_demo BOOLEAN,
+  ADD COLUMN IF NOT EXISTS demo_expires_at TIMESTAMPTZ;
+
+UPDATE companies
+SET is_demo = COALESCE(is_demo, FALSE);
+
+ALTER TABLE companies
+  ALTER COLUMN is_demo SET DEFAULT FALSE,
+  ALTER COLUMN is_demo SET NOT NULL;
+
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS permissions JSONB;
+
+UPDATE users
+SET permissions = '{}'::jsonb
+WHERE permissions IS NULL;
+
+ALTER TABLE users
+  ALTER COLUMN permissions SET DEFAULT '{}'::jsonb,
+  ALTER COLUMN permissions SET NOT NULL;
 
 -- Existing database compatibility: ensure constraints and legacy index replacements.
 DO $$
@@ -316,6 +358,17 @@ BEGIN
       ADD CONSTRAINT ck_users_full_name_not_blank
       CHECK (length(btrim(full_name)) > 0) NOT VALID;
       ALTER TABLE public.users VALIDATE CONSTRAINT ck_users_full_name_not_blank;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conname = 'ck_users_permissions_is_object'
+        AND conrelid = 'public.users'::regclass
+    ) THEN
+      ALTER TABLE public.users
+      ADD CONSTRAINT ck_users_permissions_is_object
+      CHECK (jsonb_typeof(permissions) = 'object') NOT VALID;
+      ALTER TABLE public.users VALIDATE CONSTRAINT ck_users_permissions_is_object;
     END IF;
 
     DROP INDEX IF EXISTS uq_users_one_admin_per_company;
@@ -493,6 +546,11 @@ CREATE TRIGGER trg_platform_admins_updated_at
 BEFORE UPDATE ON platform_admins
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_demo_verifications_updated_at ON demo_verifications;
+CREATE TRIGGER trg_demo_verifications_updated_at
+BEFORE UPDATE ON demo_verifications
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
 DROP TRIGGER IF EXISTS trg_users_updated_at ON users;
 CREATE TRIGGER trg_users_updated_at
 BEFORE UPDATE ON users
@@ -509,7 +567,7 @@ DECLARE
   plan_limit INTEGER;
   current_count INTEGER;
 BEGIN
-  IF NEW.role = 'employee' THEN
+  IF NEW.role = 'employee' AND NEW.is_active = TRUE THEN
     SELECT sp.max_employees
       INTO plan_limit
       FROM companies c
@@ -522,9 +580,10 @@ BEGIN
 
     SELECT COUNT(*)
       INTO current_count
-      FROM users u
+     FROM users u
      WHERE u.company_id = NEW.company_id
        AND u.role = 'employee'
+       AND u.is_active = TRUE
        AND (TG_OP = 'INSERT' OR u.id <> NEW.id);
 
     IF current_count + 1 > plan_limit THEN
@@ -538,7 +597,7 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_users_enforce_employee_limit ON users;
 CREATE TRIGGER trg_users_enforce_employee_limit
-BEFORE INSERT OR UPDATE OF role, company_id ON users
+BEFORE INSERT OR UPDATE OF role, company_id, is_active ON users
 FOR EACH ROW EXECUTE FUNCTION enforce_employee_limit();
 
 CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);
@@ -560,6 +619,8 @@ CREATE INDEX IF NOT EXISTS idx_auth_blacklist_expires_at ON auth_access_token_bl
 CREATE INDEX IF NOT EXISTS idx_auth_audit_events_created_at ON auth_audit_events(created_at);
 CREATE INDEX IF NOT EXISTS idx_auth_audit_events_type_created ON auth_audit_events(event_type, created_at);
 CREATE INDEX IF NOT EXISTS idx_auth_audit_events_principal ON auth_audit_events(principal_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_demo_verifications_status ON demo_verifications(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_demo_verifications_company ON demo_verifications(company_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_company_subscriptions_one_active_per_company
   ON company_subscriptions(company_id)
   WHERE status = 'active';

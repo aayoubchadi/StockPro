@@ -3,7 +3,24 @@ import { Router } from 'express';
 import { query, withDbClient } from '../lib/db.js';
 import { HttpError } from '../lib/httpError.js';
 import { validatePasswordPolicy } from '../lib/passwordPolicy.js';
-import { capturePayPalOrder, createPayPalOrder } from '../lib/paypalClient.js';
+import {
+  authorizePayPalOrder,
+  capturePayPalOrder,
+  createPayPalOrder,
+  voidPayPalAuthorization,
+} from '../lib/paypalClient.js';
+import { env } from '../config/env.js';
+import { signAccessToken } from '../lib/authJwt.js';
+import {
+  createAuthSession,
+  createRefreshTokenRecord,
+} from '../lib/authSessionStore.js';
+import { generateRefreshToken, hashRefreshToken } from '../lib/refreshToken.js';
+import {
+  extractEnabledPermissions,
+  resolveEffectivePermissions,
+} from '../lib/permissions.js';
+import { runWithCompanyScope } from '../lib/tenantContext.js';
 
 const router = Router();
 
@@ -34,6 +51,56 @@ function parseAmountToCents(amountValue) {
   const cents = Number(wholePart) * 100 + Number(decimalPart.padEnd(2, '0'));
 
   return Number.isInteger(cents) ? cents : null;
+}
+
+function expirationDateFromNow(seconds) {
+  return new Date(Date.now() + seconds * 1000);
+}
+
+async function issueSessionTokens({
+  principalId,
+  scope,
+  role,
+  companyId,
+  email,
+  ipAddress,
+  userAgent,
+}) {
+  const sessionExpiresAt = expirationDateFromNow(env.jwtSessionMaxLifetimeSeconds);
+  const refreshExpiresAt = expirationDateFromNow(env.jwtRefreshTtlSeconds);
+
+  const session = await createAuthSession({
+    principalId,
+    scope,
+    role,
+    companyId,
+    email,
+    expiresAt: sessionExpiresAt,
+  });
+
+  const refreshToken = generateRefreshToken();
+  const refreshTokenHash = hashRefreshToken(refreshToken);
+
+  await createRefreshTokenRecord({
+    sessionId: session.id,
+    tokenHash: refreshTokenHash,
+    expiresAt: refreshExpiresAt,
+    ipAddress,
+    userAgent,
+  });
+
+  const accessToken = signAccessToken({
+    sub: principalId,
+    role,
+    scope,
+    companyId,
+    email,
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+  };
 }
 
 function normalizeCompanySlug(companyName, requestedSlug) {
@@ -80,6 +147,107 @@ async function getPublicPlanByCode(planCode) {
   }
 
   return rows[0];
+}
+
+async function getDemoPlan() {
+  const { rows } = await query(
+    `SELECT
+       id,
+       code,
+       name,
+       monthly_price_cents,
+       currency_code,
+       max_employees,
+       can_export_reports,
+       can_use_advanced_analytics
+     FROM subscription_plans
+     WHERE code = 'demo_free'
+     LIMIT 1`
+  );
+
+  if (rows.length !== 1) {
+    throw new HttpError(
+      500,
+      'BILLING_DEMO_PLAN_MISSING',
+      'Demo plan demo_free is missing. Re-run database seed.'
+    );
+  }
+
+  return rows[0];
+}
+
+async function buildTenantLoginPayload({ companyId, userId }) {
+  const tenantContext = await runWithCompanyScope(companyId, async (client) => {
+    const { rows } = await client.query(
+      `SELECT
+         u.id,
+         u.company_id,
+         u.full_name,
+         u.email::text AS email,
+         u.role,
+         u.permissions,
+         c.slug AS company_slug,
+         c.name AS company_name,
+         c.is_demo,
+         c.demo_expires_at,
+         sp.code AS plan_code,
+         sp.name AS plan_name,
+         sp.max_employees,
+         sp.can_export_reports,
+         sp.can_use_advanced_analytics,
+         sp.currency_code
+       FROM users u
+       JOIN companies c ON c.id = u.company_id
+       JOIN subscription_plans sp ON sp.id = c.subscription_plan_id
+       WHERE u.id = $1
+         AND u.company_id = $2
+       LIMIT 1`,
+      [userId, companyId]
+    );
+
+    return rows[0] || null;
+  });
+
+  if (!tenantContext) {
+    throw new HttpError(
+      500,
+      'BILLING_TENANT_CONTEXT_MISSING',
+      'Could not resolve tenant context after provisioning'
+    );
+  }
+
+  const effectivePermissions = resolveEffectivePermissions(
+    tenantContext.role,
+    tenantContext.permissions || {}
+  );
+
+  return {
+    id: tenantContext.id,
+    companyId: tenantContext.company_id,
+    companySlug: tenantContext.company_slug,
+    fullName: tenantContext.full_name,
+    email: tenantContext.email,
+    role: tenantContext.role,
+    scope: 'tenant',
+    permissions: tenantContext.permissions || {},
+    effectivePermissions,
+    effectivePermissionList: extractEnabledPermissions(effectivePermissions),
+    company: {
+      id: tenantContext.company_id,
+      name: tenantContext.company_name,
+      slug: tenantContext.company_slug,
+      isDemo: Boolean(tenantContext.is_demo),
+      demoExpiresAt: tenantContext.demo_expires_at,
+    },
+    plan: {
+      code: tenantContext.plan_code,
+      name: tenantContext.plan_name,
+      maxEmployees: Number(tenantContext.max_employees || 0),
+      canExportReports: Boolean(tenantContext.can_export_reports),
+      canUseAdvancedAnalytics: Boolean(tenantContext.can_use_advanced_analytics),
+      currencyCode: String(tenantContext.currency_code || 'EUR').toUpperCase(),
+    },
+  };
 }
 
 async function ensureUniqueCompanySlug(client, baseSlug) {
@@ -171,6 +339,299 @@ router.get('/plans', async (_request, response, next) => {
       },
     });
   } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/demo/paypal/orders', async (_request, response, next) => {
+  try {
+    await getDemoPlan();
+
+    const order = await createPayPalOrder({
+      amountCents: 100,
+      currencyCode: 'USD',
+      description: 'StockPro demo verification hold',
+      customId: 'demo_verification',
+      intent: 'AUTHORIZE',
+    });
+
+    if (!order.id) {
+      throw new HttpError(502, 'PAYPAL_ORDER_CREATE_FAILED', 'PayPal order id is missing');
+    }
+
+    await query(
+      `INSERT INTO demo_verifications (order_id, status, raw_payload)
+       VALUES ($1, 'pending', $2::jsonb)
+       ON CONFLICT (order_id) DO UPDATE
+       SET status = 'pending',
+           raw_payload = EXCLUDED.raw_payload,
+           updated_at = NOW()`,
+      [order.id, JSON.stringify(order.raw || {})]
+    );
+
+    response.status(201).json({
+      data: {
+        orderId: order.id,
+        status: order.status,
+        approveLink: order.approveLink,
+        holdAmountCents: 100,
+        holdCurrencyCode: 'USD',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/demo/paypal/orders/:orderId/verify', async (request, response, next) => {
+  try {
+    const orderId = normalizeValue(request.params.orderId);
+    const companyName = normalizeValue(request.body.companyName);
+    const requestedCompanySlug = normalizeValue(request.body.companySlug);
+    const adminFullName = normalizeValue(request.body.adminFullName);
+    const adminEmail = normalizeEmail(request.body.adminEmail);
+    const adminPassword = normalizeValue(request.body.adminPassword);
+
+    if (!orderId) {
+      throw new HttpError(400, 'PAYPAL_ORDER_ID_REQUIRED', 'orderId is required');
+    }
+
+    if (!companyName || !adminFullName || !adminEmail || !adminPassword) {
+      throw new HttpError(
+        400,
+        'BILLING_VALIDATION_ERROR',
+        'companyName, adminFullName, adminEmail, and adminPassword are required'
+      );
+    }
+
+    if (companyName.length < 2 || companyName.length > 180) {
+      throw new HttpError(
+        400,
+        'BILLING_VALIDATION_ERROR',
+        'companyName must be between 2 and 180 characters'
+      );
+    }
+
+    if (adminFullName.length < 2 || adminFullName.length > 120) {
+      throw new HttpError(
+        400,
+        'BILLING_VALIDATION_ERROR',
+        'adminFullName must be between 2 and 120 characters'
+      );
+    }
+
+    const passwordValidation = validatePasswordPolicy(adminPassword, adminEmail);
+    if (!passwordValidation.isValid) {
+      throw new HttpError(
+        400,
+        'AUTH_VALIDATION_ERROR',
+        'Password does not meet security policy',
+        passwordValidation.errors
+      );
+    }
+
+    const demoPlan = await getDemoPlan();
+    const authorizedOrder = await authorizePayPalOrder(orderId);
+    const authorizationId = normalizeValue(
+      authorizedOrder.raw?.purchase_units?.[0]?.payments?.authorizations?.[0]?.id
+    );
+    const authorizedAmount = normalizeValue(
+      authorizedOrder.raw?.purchase_units?.[0]?.payments?.authorizations?.[0]?.amount?.value
+    );
+    const authorizedCurrency = normalizeValue(
+      authorizedOrder.raw?.purchase_units?.[0]?.payments?.authorizations?.[0]?.amount?.currency_code
+    ).toUpperCase();
+
+    if (!authorizationId) {
+      throw new HttpError(
+        409,
+        'PAYPAL_DEMO_AUTHORIZATION_MISSING',
+        'PayPal authorization id is missing for demo verification'
+      );
+    }
+
+    if (parseAmountToCents(authorizedAmount) !== 100 || authorizedCurrency !== 'USD') {
+      throw new HttpError(
+        409,
+        'PAYPAL_DEMO_AMOUNT_MISMATCH',
+        'Demo verification amount must be exactly $1.00 USD'
+      );
+    }
+
+    const voidedAuthorization = await voidPayPalAuthorization(authorizationId);
+    const normalizedCompanySlug = normalizeCompanySlug(companyName, requestedCompanySlug);
+    const adminPasswordHash = await bcrypt.hash(adminPassword, 12);
+
+    const created = await withDbClient(async (client) => {
+      try {
+        await client.query('BEGIN');
+        await client.query("SELECT set_config('app.current_scope', 'platform', true)");
+
+        const { rows: verificationRows } = await client.query(
+          `SELECT id, status, company_id
+           FROM demo_verifications
+           WHERE order_id = $1
+           LIMIT 1`,
+          [orderId]
+        );
+
+        if (
+          verificationRows.length === 1 &&
+          verificationRows[0].status === 'verified' &&
+          verificationRows[0].company_id
+        ) {
+          throw new HttpError(
+            409,
+            'BILLING_ORDER_ALREADY_CONSUMED',
+            'This demo verification order has already been used'
+          );
+        }
+
+        const uniqueCompanySlug = await ensureUniqueCompanySlug(client, normalizedCompanySlug);
+
+        const { rows: companyRows } = await client.query(
+          `INSERT INTO companies (
+             name,
+             slug,
+             subscription_plan_id,
+             is_demo,
+             demo_expires_at
+           )
+           VALUES ($1, $2, $3, TRUE, NOW() + INTERVAL '14 days')
+           RETURNING id, name, slug, is_active, is_demo, demo_expires_at, created_at`,
+          [companyName, uniqueCompanySlug, demoPlan.id]
+        );
+
+        const company = companyRows[0];
+
+        const { rows: userRows } = await client.query(
+          `INSERT INTO users (company_id, full_name, email, password_hash, role, permissions)
+           VALUES ($1, $2, $3, $4, 'company_admin', '{}'::jsonb)
+           RETURNING id, company_id, full_name, email::text AS email, role, permissions, is_active, created_at`,
+          [company.id, adminFullName, adminEmail, adminPasswordHash]
+        );
+
+        const user = userRows[0];
+
+        await client.query(
+          `INSERT INTO demo_verifications (
+             order_id,
+             authorization_id,
+             status,
+             company_id,
+             admin_email,
+             raw_payload,
+             verified_at
+           )
+           VALUES ($1, $2, 'verified', $3, $4, $5::jsonb, NOW())
+           ON CONFLICT (order_id) DO UPDATE
+           SET authorization_id = EXCLUDED.authorization_id,
+               status = 'verified',
+               company_id = EXCLUDED.company_id,
+               admin_email = EXCLUDED.admin_email,
+               raw_payload = EXCLUDED.raw_payload,
+               verified_at = NOW(),
+               updated_at = NOW()`,
+          [
+            orderId,
+            authorizationId,
+            company.id,
+            adminEmail,
+            JSON.stringify({
+              order: authorizedOrder.raw || {},
+              voidResult: voidedAuthorization.raw || { status: voidedAuthorization.status },
+            }),
+          ]
+        );
+
+        await client.query('COMMIT');
+
+        return {
+          company,
+          user,
+        };
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      }
+    });
+
+    const authUser = await buildTenantLoginPayload({
+      companyId: created.company.id,
+      userId: created.user.id,
+    });
+
+    const tokens = await issueSessionTokens({
+      principalId: created.user.id,
+      scope: 'tenant',
+      role: 'company_admin',
+      companyId: created.company.id,
+      email: created.user.email,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'] || null,
+    });
+
+    response.status(201).json({
+      data: {
+        accessToken: tokens.accessToken,
+        tokenType: 'Bearer',
+        expiresIn: env.jwtAccessTtlSeconds,
+        refreshToken: tokens.refreshToken,
+        refreshExpiresIn: env.jwtRefreshTtlSeconds,
+        user: authUser,
+        company: {
+          id: created.company.id,
+          name: created.company.name,
+          slug: created.company.slug,
+          isActive: created.company.is_active,
+          isDemo: created.company.is_demo,
+          demoExpiresAt: created.company.demo_expires_at,
+          createdAt: created.company.created_at,
+        },
+        verification: {
+          orderId,
+          authorizationId,
+          status: 'verified',
+          voidStatus: voidedAuthorization.status,
+        },
+      },
+    });
+  } catch (error) {
+    if (error?.code === '23505') {
+      if (error.constraint === 'companies_name_key') {
+        next(
+          new HttpError(
+            409,
+            'BILLING_COMPANY_NAME_EXISTS',
+            'A company with this name already exists'
+          )
+        );
+        return;
+      }
+
+      if (error.constraint === 'companies_slug_key') {
+        next(
+          new HttpError(
+            409,
+            'BILLING_COMPANY_SLUG_EXISTS',
+            'A company with this slug already exists'
+          )
+        );
+        return;
+      }
+
+      if (error.constraint === 'uq_users_company_email' || error.constraint === 'users_email_key') {
+        next(
+          new HttpError(
+            409,
+            'BILLING_ADMIN_EMAIL_EXISTS',
+            'This admin email is already in use. Please use a different email.'
+          )
+        );
+        return;
+      }
+    }
+
     next(error);
   }
 });

@@ -46,6 +46,7 @@ INSERT INTO subscription_plans (
   can_use_advanced_analytics
 )
 VALUES
+  ('demo_free', 'Demo Free', 0, 'USD', 20, FALSE, FALSE),
   ('starter_20', 'Starter 20', 7900, 'EUR', 20, FALSE, FALSE),
   ('growth_50', 'Growth 50', 14900, 'EUR', 50, TRUE, FALSE),
   ('enterprise_150', 'Enterprise 150', 29900, 'EUR', 150, TRUE, TRUE)
@@ -146,8 +147,8 @@ SET
   raw_payload = EXCLUDED.raw_payload,
   updated_at = NOW();
 
-INSERT INTO users (company_id, full_name, email, password_hash, role)
-SELECT c.id, 'Acme Admin', 'admin@acme.local', crypt('Admin@123', gen_salt('bf', 10)), 'company_admin'
+INSERT INTO users (company_id, full_name, email, password_hash, role, permissions)
+SELECT c.id, 'Acme Admin', 'admin@acme.local', crypt('Admin@123', gen_salt('bf', 10)), 'company_admin', '{}'::jsonb
 FROM companies c
 WHERE c.slug = 'acme-logistics'
 ON CONFLICT (company_id, email) DO UPDATE
@@ -155,10 +156,16 @@ SET
   full_name = EXCLUDED.full_name,
   password_hash = EXCLUDED.password_hash,
   role = EXCLUDED.role,
+  permissions = EXCLUDED.permissions,
   is_active = TRUE;
 
-INSERT INTO users (company_id, full_name, email, password_hash, role)
-SELECT c.id, 'Acme Employee', 'employee1@acme.local', crypt('Employee@123', gen_salt('bf', 10)), 'employee'
+INSERT INTO users (company_id, full_name, email, password_hash, role, permissions)
+SELECT c.id, 'Acme Employee', 'employee1@acme.local', crypt('Employee@123', gen_salt('bf', 10)), 'employee',
+  jsonb_build_object(
+    'inventory.view', TRUE,
+    'reports.view', TRUE,
+    'stock.move', TRUE
+  )
 FROM companies c
 WHERE c.slug = 'acme-logistics'
 ON CONFLICT (company_id, email) DO UPDATE
@@ -166,10 +173,11 @@ SET
   full_name = EXCLUDED.full_name,
   password_hash = EXCLUDED.password_hash,
   role = EXCLUDED.role,
+  permissions = EXCLUDED.permissions,
   is_active = TRUE;
 
-INSERT INTO users (company_id, full_name, email, password_hash, role)
-SELECT c.id, 'Nova Admin', 'admin@nova.local', crypt('NovaAdmin@123', gen_salt('bf', 10)), 'company_admin'
+INSERT INTO users (company_id, full_name, email, password_hash, role, permissions)
+SELECT c.id, 'Nova Admin', 'admin@nova.local', crypt('NovaAdmin@123', gen_salt('bf', 10)), 'company_admin', '{}'::jsonb
 FROM companies c
 WHERE c.slug = 'nova-retail'
 ON CONFLICT (company_id, email) DO UPDATE
@@ -177,6 +185,7 @@ SET
   full_name = EXCLUDED.full_name,
   password_hash = EXCLUDED.password_hash,
   role = EXCLUDED.role,
+  permissions = EXCLUDED.permissions,
   is_active = TRUE;
 
 INSERT INTO products (company_id, sku, name, description, unit_price, quantity_in_stock, low_stock_threshold)
