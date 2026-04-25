@@ -44,6 +44,19 @@ function formatPayPalError(payload, fallbackMessage) {
   };
 }
 
+function errorHasPayPalIssue(error, issueCode) {
+  const normalizedIssueCode = String(issueCode || '').trim().toUpperCase();
+
+  if (!normalizedIssueCode || !Array.isArray(error?.details)) {
+    return false;
+  }
+
+  return error.details.some((detail) => {
+    const normalizedDetail = String(detail || '').trim().toUpperCase();
+    return normalizedDetail === `ISSUE=${normalizedIssueCode}`;
+  });
+}
+
 async function fetchPayPalAccessToken() {
   ensurePayPalConfigured();
 
@@ -156,7 +169,7 @@ export async function createPayPalOrder({
   };
 }
 
-export async function capturePayPalOrder(orderId) {
+export async function getPayPalOrder(orderId) {
   const normalizedOrderId = String(orderId || '').trim();
 
   if (!normalizedOrderId) {
@@ -164,13 +177,53 @@ export async function capturePayPalOrder(orderId) {
   }
 
   const payload = await paypalApiRequest(
-    `/v2/checkout/orders/${encodeURIComponent(normalizedOrderId)}/capture`,
+    `/v2/checkout/orders/${encodeURIComponent(normalizedOrderId)}`,
     {
-      method: 'POST',
-      body: {},
-      requestId: normalizedOrderId,
+      method: 'GET',
     }
   );
+
+  return {
+    id: payload?.id || normalizedOrderId,
+    status: payload?.status || null,
+    raw: payload,
+  };
+}
+
+export async function capturePayPalOrder(orderId) {
+  const normalizedOrderId = String(orderId || '').trim();
+
+  if (!normalizedOrderId) {
+    throw new HttpError(400, 'PAYPAL_ORDER_ID_REQUIRED', 'orderId is required');
+  }
+
+  let payload;
+
+  try {
+    payload = await paypalApiRequest(
+      `/v2/checkout/orders/${encodeURIComponent(normalizedOrderId)}/capture`,
+      {
+        method: 'POST',
+        body: {},
+        requestId: normalizedOrderId,
+      }
+    );
+  } catch (error) {
+    if (
+      error?.code === 'PAYPAL_API_ERROR' &&
+      errorHasPayPalIssue(error, 'ORDER_ALREADY_CAPTURED')
+    ) {
+      const existingOrder = await getPayPalOrder(normalizedOrderId);
+
+      return {
+        id: existingOrder.id,
+        status: existingOrder.status,
+        raw: existingOrder.raw,
+      };
+    }
+
+    throw error;
+  }
 
   return {
     id: payload?.id || normalizedOrderId,

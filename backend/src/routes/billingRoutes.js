@@ -206,6 +206,11 @@ router.post('/paypal/orders', async (request, response, next) => {
 router.post('/paypal/orders/:orderId/capture', async (request, response, next) => {
   try {
     const orderId = normalizeValue(request.params.orderId);
+
+    if (!orderId) {
+      throw new HttpError(400, 'PAYPAL_ORDER_ID_REQUIRED', 'orderId is required');
+    }
+
     const plan = await getPublicPlanByCode(request.body.planCode);
 
     const companyName = normalizeValue(request.body.companyName);
@@ -293,15 +298,7 @@ router.post('/paypal/orders/:orderId/capture', async (request, response, next) =
       );
     }
 
-    const providerOrderId = normalizeValue(capture?.id || capturedOrder.id);
-
-    if (!providerOrderId) {
-      throw new HttpError(
-        502,
-        'PAYPAL_CAPTURE_INVALID',
-        'Captured order id is missing from PayPal response'
-      );
-    }
+    const providerOrderId = orderId;
 
     const normalizedCompanySlug = normalizeCompanySlug(companyName, requestedCompanySlug);
     const adminPasswordHash = await bcrypt.hash(adminPassword, 12);
@@ -309,6 +306,7 @@ router.post('/paypal/orders/:orderId/capture', async (request, response, next) =
     const created = await withDbClient(async (client) => {
       try {
         await client.query('BEGIN');
+        await client.query("SELECT set_config('app.current_scope', 'platform', true)");
 
         const { rows: existingSubscriptionRows } = await client.query(
           `SELECT id
@@ -449,6 +447,61 @@ router.post('/paypal/orders/:orderId/capture', async (request, response, next) =
         );
         return;
       }
+
+      if (error.constraint === 'uq_company_subscriptions_one_active_per_company') {
+        next(
+          new HttpError(
+            409,
+            'BILLING_ACTIVE_SUBSCRIPTION_EXISTS',
+            'This company already has an active subscription'
+          )
+        );
+        return;
+      }
+
+      if (error.constraint === 'uq_users_company_email' || error.constraint === 'users_email_key') {
+        next(
+          new HttpError(
+            409,
+            'BILLING_ADMIN_EMAIL_EXISTS',
+            'This admin email is already in use. Please use a different email.'
+          )
+        );
+        return;
+      }
+
+      if (error.constraint === 'uq_users_one_active_admin_per_company') {
+        next(
+          new HttpError(
+            409,
+            'BILLING_COMPANY_ADMIN_EXISTS',
+            'This company already has an active admin account'
+          )
+        );
+        return;
+      }
+    }
+
+    if (error?.code === '42501') {
+      next(
+        new HttpError(
+          500,
+          'BILLING_DB_POLICY_ERROR',
+          'Billing write was blocked by database policy configuration'
+        )
+      );
+      return;
+    }
+
+    if (error?.code === '42703' || error?.code === '42P01') {
+      next(
+        new HttpError(
+          500,
+          'BILLING_SCHEMA_OUTDATED',
+          'Billing database schema is outdated. Apply backend/db/schema.sql and retry.'
+        )
+      );
+      return;
     }
 
     next(error);

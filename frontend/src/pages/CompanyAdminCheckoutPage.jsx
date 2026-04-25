@@ -73,11 +73,56 @@ function validateAdminPassword(password, email) {
   return errors;
 }
 
+function getCheckoutValidationError({ selectedPlan, form }) {
+  if (!selectedPlan) {
+    return 'Please select a subscription plan.';
+  }
+
+  if (!String(form.companyName || '').trim()) {
+    return 'Company name is required.';
+  }
+
+  if (!String(form.adminFullName || '').trim()) {
+    return 'Admin full name is required.';
+  }
+
+  if (!String(form.adminEmail || '').trim()) {
+    return 'Admin email is required.';
+  }
+
+  if (!form.adminPassword || !form.adminPasswordConfirm) {
+    return 'Please complete and confirm your admin password.';
+  }
+
+  const passwordPolicyErrors = validateAdminPassword(form.adminPassword, form.adminEmail);
+
+  if (passwordPolicyErrors.length > 0) {
+    return `Password policy: ${passwordPolicyErrors.join(', ')}`;
+  }
+
+  if (form.adminPassword !== form.adminPasswordConfirm) {
+    return 'Passwords do not match.';
+  }
+
+  return '';
+}
+
 export default function CompanyAdminCheckoutPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const paypalButtonsRef = useRef(null);
   const paypalButtonsInstanceRef = useRef(null);
+  const formRef = useRef({
+    companyName: '',
+    companySlug: '',
+    adminFullName: '',
+    adminEmail: '',
+    adminPassword: '',
+    adminPasswordConfirm: '',
+  });
+  const selectedPlanRef = useRef(null);
+  const isCaptureInFlightRef = useRef(false);
+  const capturedOrderIdsRef = useRef(new Set());
   const [plans, setPlans] = useState([]);
   const [isPlansLoading, setIsPlansLoading] = useState(true);
   const [isPayPalSdkReady, setIsPayPalSdkReady] = useState(false);
@@ -131,6 +176,14 @@ export default function CompanyAdminCheckoutPage() {
 
     return true;
   }, [form, passwordErrors, selectedPlan]);
+
+  useEffect(() => {
+    formRef.current = form;
+  }, [form]);
+
+  useEffect(() => {
+    selectedPlanRef.current = selectedPlan;
+  }, [selectedPlan]);
 
   useEffect(() => {
     let isActive = true;
@@ -255,7 +308,7 @@ export default function CompanyAdminCheckoutPage() {
 
     paypalButtonsRef.current.innerHTML = '';
 
-    if (!isFormValid || !selectedPlan || isCapturing) {
+    if (!selectedPlan) {
       return undefined;
     }
 
@@ -266,12 +319,41 @@ export default function CompanyAdminCheckoutPage() {
         label: 'paypal',
         height: 44,
       },
+      onClick: (_data, actions) => {
+        if (isCaptureInFlightRef.current) {
+          return actions.reject();
+        }
+
+        const currentPlan = selectedPlanRef.current || selectedPlan;
+        const currentForm = formRef.current || form;
+
+        const validationError = getCheckoutValidationError({
+          selectedPlan: currentPlan,
+          form: currentForm,
+        });
+
+        if (validationError) {
+          setMessage(validationError);
+          setMessageType('error');
+          return actions.reject();
+        }
+
+        setMessage('');
+        setMessageType('');
+        return actions.resolve();
+      },
       createOrder: async () => {
         setMessage('');
         setMessageType('');
 
+        const currentPlan = selectedPlanRef.current || selectedPlan;
+
+        if (!currentPlan?.code) {
+          throw new Error('Please select a subscription plan before continuing.');
+        }
+
         const order = await createPayPalOrder({
-          planCode: selectedPlan.code,
+          planCode: currentPlan.code,
         });
 
         if (!order?.orderId) {
@@ -281,24 +363,52 @@ export default function CompanyAdminCheckoutPage() {
         return order.orderId;
       },
       onApprove: async (data) => {
+        const approvedOrderId = String(data?.orderID || '').trim();
+
+        if (!approvedOrderId) {
+          setMessage('PayPal approval did not return an order id. Please try again.');
+          setMessageType('error');
+          return;
+        }
+
+        if (capturedOrderIdsRef.current.has(approvedOrderId) || isCaptureInFlightRef.current) {
+          return;
+        }
+
+        const currentPlan = selectedPlanRef.current || selectedPlan;
+        const currentForm = formRef.current || form;
+        const validationError = getCheckoutValidationError({
+          selectedPlan: currentPlan,
+          form: currentForm,
+        });
+
+        if (validationError) {
+          setMessage(validationError);
+          setMessageType('error');
+          return;
+        }
+
+        isCaptureInFlightRef.current = true;
+        capturedOrderIdsRef.current.add(approvedOrderId);
+
         try {
           setIsCapturing(true);
           setMessage('Finalizing payment and creating your company workspace...');
           setMessageType('');
 
           const captured = await capturePayPalOrderAndCreateAdmin({
-            orderId: data.orderID,
-            planCode: selectedPlan.code,
-            companyName: form.companyName,
-            companySlug: form.companySlug,
-            adminFullName: form.adminFullName,
-            adminEmail: form.adminEmail,
-            adminPassword: form.adminPassword,
+            orderId: approvedOrderId,
+            planCode: currentPlan.code,
+            companyName: currentForm.companyName,
+            companySlug: currentForm.companySlug,
+            adminFullName: currentForm.adminFullName,
+            adminEmail: currentForm.adminEmail,
+            adminPassword: currentForm.adminPassword,
           });
 
           const loginData = await loginRequest({
-            email: form.adminEmail.trim().toLowerCase(),
-            password: form.adminPassword,
+            email: currentForm.adminEmail.trim().toLowerCase(),
+            password: currentForm.adminPassword,
             companyId: captured?.company?.id || null,
             accountScope: 'tenant',
           });
@@ -310,8 +420,8 @@ export default function CompanyAdminCheckoutPage() {
             expiresIn: loginData.expiresIn,
             refreshExpiresIn: loginData.refreshExpiresIn,
             user: loginData.user,
-            email: loginData.user?.email || form.adminEmail.trim().toLowerCase(),
-            fullName: loginData.user?.fullName || form.adminFullName,
+            email: loginData.user?.email || currentForm.adminEmail.trim().toLowerCase(),
+            fullName: loginData.user?.fullName || currentForm.adminFullName,
             role: loginData.user?.role || 'company_admin',
             scope: loginData.user?.scope || 'tenant',
             companyId: loginData.user?.companyId || captured?.company?.id || null,
@@ -324,13 +434,21 @@ export default function CompanyAdminCheckoutPage() {
             navigate(getDashboardPathForRole(loginData.user?.role || 'company_admin'));
           }, 700);
         } catch (error) {
+          capturedOrderIdsRef.current.delete(approvedOrderId);
           setMessage(error.message || 'Payment was approved but account creation failed.');
           setMessageType('error');
         } finally {
+          isCaptureInFlightRef.current = false;
           setIsCapturing(false);
         }
       },
+      onCancel: () => {
+        setMessage('PayPal checkout was cancelled.');
+        setMessageType('error');
+      },
       onError: (error) => {
+        isCaptureInFlightRef.current = false;
+        setIsCapturing(false);
         setMessage(error?.message || 'PayPal checkout failed.');
         setMessageType('error');
       },
@@ -353,12 +471,9 @@ export default function CompanyAdminCheckoutPage() {
       paypalButtonsInstanceRef.current = null;
     };
   }, [
-    form,
-    isCapturing,
-    isFormValid,
     isPayPalSdkReady,
     navigate,
-    selectedPlan,
+    selectedPlan?.code,
   ]);
 
   return (
