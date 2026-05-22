@@ -212,8 +212,19 @@ export default function TeamAccessPage() {
     });
   }, [employees, searchQuery, selectedStatus]);
 
+  // Count only non-admin employees
+  const totalNonAdminEmployees = useMemo(
+    () => employees.filter((employee) => employee.role !== 'company_admin').length,
+    [employees]
+  );
+
   const activeEmployees = useMemo(
-    () => employees.filter((employee) => employee.isActive).length,
+    () => employees.filter((employee) => employee.role !== 'company_admin' && employee.isActive).length,
+    [employees]
+  );
+
+  const inactiveEmployees = useMemo(
+    () => employees.filter((employee) => employee.role !== 'company_admin' && !employee.isActive).length,
     [employees]
   );
 
@@ -473,30 +484,34 @@ export default function TeamAccessPage() {
                   <Users className="h-5 w-5 text-muted-foreground" />
                   <span className="text-sm font-medium text-muted-foreground">Total Employees</span>
                 </div>
-                <p className="mt-2 text-3xl font-bold">{employees.length}</p>
+                <p className="mt-2 text-3xl font-bold">{totalNonAdminEmployees}</p>
+                <p className="text-xs text-muted-foreground mt-1">Excluding admins</p>
               </div>
               <div className="rounded-lg border bg-card p-6">
                 <div className="flex items-center gap-2">
                   <Check className="h-5 w-5 text-green-600" />
-                  <span className="text-sm font-medium text-muted-foreground">Active</span>
+                  <span className="text-sm font-medium text-muted-foreground">Active Employees</span>
                 </div>
                 <p className="mt-2 text-3xl font-bold">{activeEmployees}</p>
+                <p className="text-xs text-muted-foreground mt-1">Excluding admins</p>
               </div>
               <div className="rounded-lg border bg-card p-6">
                 <div className="flex items-center gap-2">
                   <Shield className="h-5 w-5 text-purple-600" />
-                  <span className="text-sm font-medium text-muted-foreground">Admins</span>
+                  <span className="text-sm font-medium text-muted-foreground">Company Admins</span>
                 </div>
                 <p className="mt-2 text-3xl font-bold">{adminEmployees}</p>
+                <p className="text-xs text-muted-foreground mt-1">{context?.capacity?.maxAdmins || 2} max</p>
               </div>
               <div className="rounded-lg border bg-card p-6">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-blue-600" />
-                  <span className="text-sm font-medium text-muted-foreground">Inactive</span>
+                  <span className="text-sm font-medium text-muted-foreground">Inactive Employees</span>
                 </div>
                 <p className="mt-2 text-3xl font-bold">
-                  {employees.filter((employee) => !employee.isActive).length}
+                  {inactiveEmployees}
                 </p>
+                <p className="text-xs text-muted-foreground mt-1">Excluding admins</p>
               </div>
             </div>
 
