@@ -324,12 +324,18 @@ function mapPlanRow(plan) {
   };
 }
 
+// Convert MAD prices to USD for PayPal (PayPal does not support MAD)
+// Exchange rate: 1 USD ≈ 10 MAD
+function convertMADToUSD(madCents) {
+  return Math.round(madCents / 10);
+}
+
 function getFallbackPlans() {
   return [
     {
       code: 'starter_20',
       name: 'Starter 20',
-      monthlyPriceCents: 7900,
+      monthlyPriceCents: 79900,
       currencyCode: 'MAD',
       maxEmployees: 20,
       maxAdmins: 1,
@@ -341,7 +347,7 @@ function getFallbackPlans() {
     {
       code: 'growth_50',
       name: 'Growth 50',
-      monthlyPriceCents: 14900,
+      monthlyPriceCents: 149900,
       currencyCode: 'MAD',
       maxEmployees: 50,
       maxAdmins: 2,
@@ -353,7 +359,7 @@ function getFallbackPlans() {
     {
       code: 'enterprise_150',
       name: 'Enterprise 150',
-      monthlyPriceCents: 29900,
+      monthlyPriceCents: 299900,
       currencyCode: 'MAD',
       maxEmployees: 150,
       maxAdmins: 5,
@@ -705,9 +711,17 @@ router.post('/paypal/orders', async (request, response, next) => {
   try {
     const plan = await getPublicPlanByCode(request.body.planCode);
 
+    // If plan is priced in MAD, convert to USD for PayPal (PayPal doesn't support MAD)
+    let paypalCurrency = String(plan.currency_code || 'MAD').toUpperCase();
+    let paypalAmountCents = Number(plan.monthly_price_cents);
+    if (paypalCurrency === 'MAD') {
+      paypalCurrency = 'USD';
+      paypalAmountCents = convertMADToUSD(Number(plan.monthly_price_cents));
+    }
+
     const order = await createPayPalOrder({
-      amountCents: Number(plan.monthly_price_cents),
-      currencyCode: plan.currency_code,
+      amountCents: paypalAmountCents,
+      currencyCode: paypalCurrency,
       description: `StockPro ${plan.name} monthly subscription`,
       customId: plan.code,
     });
@@ -801,7 +815,15 @@ router.post('/paypal/orders/:orderId/capture', async (request, response, next) =
     );
     const capturedCustomId = normalizeValue(purchaseUnit?.custom_id);
 
-    if (!capturedAmountCents || capturedCurrencyCode !== String(plan.currency_code || 'MAD').toUpperCase()) {
+    // Determine expected currency/amount for the plan. Convert MAD plans to USD for PayPal.
+    let expectedCurrency = String(plan.currency_code || 'MAD').toUpperCase();
+    let expectedAmountCents = Number(plan.monthly_price_cents);
+    if (expectedCurrency === 'MAD') {
+      expectedCurrency = 'USD';
+      expectedAmountCents = convertMADToUSD(Number(plan.monthly_price_cents));
+    }
+
+    if (!capturedAmountCents || capturedCurrencyCode !== expectedCurrency) {
       throw new HttpError(
         409,
         'PAYPAL_CAPTURE_AMOUNT_MISMATCH',
@@ -809,7 +831,7 @@ router.post('/paypal/orders/:orderId/capture', async (request, response, next) =
       );
     }
 
-    if (capturedAmountCents !== Number(plan.monthly_price_cents)) {
+    if (capturedAmountCents !== expectedAmountCents) {
       throw new HttpError(
         409,
         'PAYPAL_CAPTURE_AMOUNT_MISMATCH',

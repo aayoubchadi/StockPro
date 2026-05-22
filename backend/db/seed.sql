@@ -49,10 +49,10 @@ INSERT INTO subscription_plans (
   can_use_advanced_analytics
 )
 VALUES
-  ('demo_free', 'Demo Free', 0, 'USD', 20, 2, FALSE, FALSE),
-  ('starter_20', 'Starter 20', 7900, 'EUR', 20, 1, FALSE, FALSE),
-  ('growth_50', 'Growth 50', 14900, 'EUR', 50, 2, TRUE, FALSE),
-  ('enterprise_150', 'Enterprise 150', 29900, 'EUR', 150, 5, TRUE, TRUE)
+  ('demo_free', 'Demo Free', 0, 'MAD', 20, 2, FALSE, FALSE),
+  ('starter_20', 'Starter 20', 79900, 'MAD', 20, 1, FALSE, FALSE),
+  ('growth_50', 'Growth 50', 149900, 'MAD', 50, 2, TRUE, FALSE),
+  ('enterprise_150', 'Enterprise 150', 299900, 'MAD', 150, 5, TRUE, TRUE)
 ON CONFLICT (code) DO UPDATE
 SET
   name = EXCLUDED.name,
