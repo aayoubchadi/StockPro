@@ -138,7 +138,8 @@ CREATE TABLE IF NOT EXISTS company_subscriptions (
 ALTER TABLE subscription_plans
   ADD COLUMN IF NOT EXISTS monthly_price_cents INTEGER,
   ADD COLUMN IF NOT EXISTS currency_code CHAR(3),
-  ADD COLUMN IF NOT EXISTS paypal_plan_reference VARCHAR(120);
+  ADD COLUMN IF NOT EXISTS paypal_plan_reference VARCHAR(120),
+  ADD COLUMN IF NOT EXISTS max_admins INTEGER;
 
 UPDATE subscription_plans
 SET
@@ -149,7 +150,13 @@ ALTER TABLE subscription_plans
   ALTER COLUMN monthly_price_cents SET DEFAULT 0,
   ALTER COLUMN monthly_price_cents SET NOT NULL,
   ALTER COLUMN currency_code SET DEFAULT 'EUR',
-  ALTER COLUMN currency_code SET NOT NULL;
+  ALTER COLUMN currency_code SET NOT NULL,
+  ALTER COLUMN max_admins SET DEFAULT 2,
+  ALTER COLUMN max_admins SET NOT NULL;
+
+ALTER TABLE subscription_plans
+  DROP CONSTRAINT IF EXISTS subscription_plans_max_admins_check,
+  ADD CONSTRAINT subscription_plans_max_admins_check CHECK (max_admins BETWEEN 1 AND 10);
 
 ALTER TABLE company_subscriptions
   ADD COLUMN IF NOT EXISTS raw_payload JSONB;

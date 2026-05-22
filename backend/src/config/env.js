@@ -174,5 +174,27 @@ export const env = {
     paypalEnvironment,
     process.env.PAYPAL_API_BASE_URL
   ),
+  // Exchange rate used to convert MAD prices (stored as cents) to USD cents
+  // for PayPal transactions. Set PAYPAL_MAD_TO_USD_RATE in the environment
+  // (for example: 0.1 for 1 USD = 10 MAD). Defaults to 0.1.
+  madToUsdRate: (() => {
+    const raw = process.env.PAYPAL_MAD_TO_USD_RATE;
+    if (raw === undefined || raw === '') {
+      return 0.1;
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      throw new Error(`Invalid PAYPAL_MAD_TO_USD_RATE: expected a positive number, got "${raw}"`);
+    }
+    return parsed;
+  })(),
+  // Fallback currency to use for PayPal when native plan currency is unsupported (e.g., MAD)
+  paypalFallbackCurrency: (function () {
+    const raw = String(process.env.PAYPAL_FALLBACK_CURRENCY || 'USD').trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(raw)) {
+      throw new Error(`Invalid PAYPAL_FALLBACK_CURRENCY: expected a 3-letter currency code, got "${raw}"`);
+    }
+    return raw;
+  })(),
   isPayPalConfigured: Boolean(paypalClientId && paypalClientSecret),
 };

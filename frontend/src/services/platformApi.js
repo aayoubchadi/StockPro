@@ -187,6 +187,27 @@ export async function createPayPalOrder({ planCode }) {
   return payload?.data;
 }
 
+export async function getPayPalCheckoutMetadata({ planCode }) {
+  const normalizedPlanCode = String(planCode || '').trim();
+
+  if (!normalizedPlanCode) {
+    throw new Error('Plan code is required');
+  }
+
+  const { response, payload } = await fetchApiEndpoint(
+    `/api/v1/billing/paypal/checkout-metadata?planCode=${encodeURIComponent(normalizedPlanCode)}`,
+    {
+      method: 'GET',
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(resolveErrorMessage(payload, 'Unable to load PayPal checkout metadata'));
+  }
+
+  return payload?.data;
+}
+
 export async function capturePayPalOrderAndCreateAdmin({
   orderId,
   planCode,

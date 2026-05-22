@@ -1,6 +1,7 @@
 import { query } from './db.js';
 
 let companyDemoColumnCapabilitiesPromise = null;
+let companyOwnerColumnCapabilitiesPromise = null;
 
 async function loadCompanyDemoColumnCapabilities() {
   if (!companyDemoColumnCapabilitiesPromise) {
@@ -64,4 +65,42 @@ export async function buildCompanyCreateFragments() {
     returningColumns:
       'id, name, slug, is_active, FALSE AS is_demo, NULL::timestamptz AS demo_expires_at, created_at',
   };
+}
+
+async function loadCompanyOwnerColumnCapabilities() {
+  if (!companyOwnerColumnCapabilitiesPromise) {
+    companyOwnerColumnCapabilitiesPromise = (async () => {
+      const { rows } = await query(`SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'companies'
+          AND column_name = 'owner_id'
+      ) AS has_owner_id`);
+
+      return {
+        hasOwnerId: Boolean(rows[0]?.has_owner_id),
+      };
+    })().catch((error) => {
+      companyOwnerColumnCapabilitiesPromise = null;
+      throw error;
+    });
+  }
+
+  return companyOwnerColumnCapabilitiesPromise;
+}
+
+export async function setCompanyOwnerIfSupported(client, { companyId, ownerId }) {
+  const capabilities = await loadCompanyOwnerColumnCapabilities();
+
+  if (!capabilities.hasOwnerId) {
+    return false;
+  }
+
+  await client.query(
+    `UPDATE companies SET owner_id = $1 WHERE id = $2`,
+    [ownerId, companyId]
+  );
+
+  return true;
 }

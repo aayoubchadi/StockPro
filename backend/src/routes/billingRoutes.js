@@ -12,6 +12,7 @@ import {
 import {
   buildCompanyCreateFragments,
   buildCompanyDemoSelect,
+  setCompanyOwnerIfSupported,
 } from '../lib/companyCompatibility.js';
 import { buildUserPermissionsSelect, buildUserPermissionsInsertFragments } from '../lib/userCompatibility.js';
 import { env } from '../config/env.js';
@@ -308,13 +309,34 @@ async function ensureUniqueCompanySlug(client, baseSlug) {
   );
 }
 
+function resolvePayPalChargeForPlan(plan) {
+  const planCurrency = String(plan.currency_code || 'MAD').toUpperCase();
+  const planAmountCents = Number(plan.monthly_price_cents);
+
+  if (planCurrency === 'MAD') {
+    return {
+      amountCents: convertMADToUSD(planAmountCents),
+      currencyCode: env.paypalFallbackCurrency,
+    };
+  }
+
+  return {
+    amountCents: planAmountCents,
+    currencyCode: planCurrency,
+  };
+}
+
 function mapPlanRow(plan) {
+  const paypalCharge = resolvePayPalChargeForPlan(plan);
+
   return {
     id: plan.id,
     code: plan.code,
     name: plan.name,
     monthlyPriceCents: Number(plan.monthly_price_cents),
     currencyCode: String(plan.currency_code || 'MAD').toUpperCase(),
+    paypalAmountCents: paypalCharge.amountCents,
+    paypalCurrencyCode: paypalCharge.currencyCode,
     maxEmployees: Number(plan.max_employees),
     maxAdmins: Number(plan.max_admins || 2),
     features: {
@@ -325,9 +347,10 @@ function mapPlanRow(plan) {
 }
 
 // Convert MAD prices to USD for PayPal (PayPal does not support MAD)
-// Exchange rate: 1 USD ≈ 10 MAD
+// Convert MAD prices (in cents) to USD cents for PayPal using env-configurable rate.
 function convertMADToUSD(madCents) {
-  return Math.round(madCents / 10);
+  const rate = Number(env.madToUsdRate || 0.1);
+  return Math.round(Number(madCents) * rate);
 }
 
 function getFallbackPlans() {
@@ -335,10 +358,12 @@ function getFallbackPlans() {
     {
       code: 'starter_20',
       name: 'Starter 20',
-      monthlyPriceCents: 79900,
-      currencyCode: 'MAD',
+      monthlyPriceCents: 7900,
+      currencyCode: 'EUR',
+      paypalAmountCents: 7900,
+      paypalCurrencyCode: 'EUR',
       maxEmployees: 20,
-      maxAdmins: 1,
+      maxAdmins: 2,
       features: {
         canExportReports: false,
         canUseAdvancedAnalytics: false,
@@ -347,8 +372,10 @@ function getFallbackPlans() {
     {
       code: 'growth_50',
       name: 'Growth 50',
-      monthlyPriceCents: 149900,
-      currencyCode: 'MAD',
+      monthlyPriceCents: 14900,
+      currencyCode: 'EUR',
+      paypalAmountCents: 14900,
+      paypalCurrencyCode: 'EUR',
       maxEmployees: 50,
       maxAdmins: 2,
       features: {
@@ -359,10 +386,12 @@ function getFallbackPlans() {
     {
       code: 'enterprise_150',
       name: 'Enterprise 150',
-      monthlyPriceCents: 299900,
-      currencyCode: 'MAD',
+      monthlyPriceCents: 29900,
+      currencyCode: 'EUR',
+      paypalAmountCents: 29900,
+      paypalCurrencyCode: 'EUR',
       maxEmployees: 150,
-      maxAdmins: 5,
+      maxAdmins: 2,
       features: {
         canExportReports: true,
         canUseAdvancedAnalytics: true,
@@ -381,7 +410,6 @@ router.get('/plans', async (_request, response, next) => {
          monthly_price_cents,
          currency_code,
          max_employees,
-         max_admins,
          can_export_reports,
          can_use_advanced_analytics
        FROM subscription_plans
@@ -401,6 +429,25 @@ router.get('/plans', async (_request, response, next) => {
       },
       warning: 'FALLBACK_PLANS_USED',
     });
+  }
+});
+
+router.get('/paypal/checkout-metadata', async (request, response, next) => {
+  try {
+    const plan = await getPublicPlanByCode(request.query.planCode);
+    const paypalCharge = resolvePayPalChargeForPlan(plan);
+
+    response.json({
+      data: {
+        plan: mapPlanRow(plan),
+        payment: {
+          amountCents: paypalCharge.amountCents,
+          currencyCode: paypalCharge.currencyCode,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
   }
 });
 
@@ -578,11 +625,10 @@ router.post('/demo/paypal/orders/:orderId/verify', async (request, response, nex
 
         const user = userRows[0];
 
-        // Set the admin as the subscription owner
-        await client.query(
-          `UPDATE companies SET owner_id = $1 WHERE id = $2`,
-          [user.id, company.id]
-        );
+        await setCompanyOwnerIfSupported(client, {
+          companyId: company.id,
+          ownerId: user.id,
+        });
 
         await client.query(
           `INSERT INTO demo_verifications (
@@ -711,17 +757,11 @@ router.post('/paypal/orders', async (request, response, next) => {
   try {
     const plan = await getPublicPlanByCode(request.body.planCode);
 
-    // If plan is priced in MAD, convert to USD for PayPal (PayPal doesn't support MAD)
-    let paypalCurrency = String(plan.currency_code || 'MAD').toUpperCase();
-    let paypalAmountCents = Number(plan.monthly_price_cents);
-    if (paypalCurrency === 'MAD') {
-      paypalCurrency = 'USD';
-      paypalAmountCents = convertMADToUSD(Number(plan.monthly_price_cents));
-    }
+    const paypalCharge = resolvePayPalChargeForPlan(plan);
 
     const order = await createPayPalOrder({
-      amountCents: paypalAmountCents,
-      currencyCode: paypalCurrency,
+      amountCents: paypalCharge.amountCents,
+      currencyCode: paypalCharge.currencyCode,
       description: `StockPro ${plan.name} monthly subscription`,
       customId: plan.code,
     });
@@ -736,6 +776,10 @@ router.post('/paypal/orders', async (request, response, next) => {
         status: order.status,
         approveLink: order.approveLink,
         plan: mapPlanRow(plan),
+        payment: {
+          amountCents: paypalCharge.amountCents,
+          currencyCode: paypalCharge.currencyCode,
+        },
       },
     });
   } catch (error) {
@@ -815,13 +859,9 @@ router.post('/paypal/orders/:orderId/capture', async (request, response, next) =
     );
     const capturedCustomId = normalizeValue(purchaseUnit?.custom_id);
 
-    // Determine expected currency/amount for the plan. Convert MAD plans to USD for PayPal.
-    let expectedCurrency = String(plan.currency_code || 'MAD').toUpperCase();
-    let expectedAmountCents = Number(plan.monthly_price_cents);
-    if (expectedCurrency === 'MAD') {
-      expectedCurrency = 'USD';
-      expectedAmountCents = convertMADToUSD(Number(plan.monthly_price_cents));
-    }
+    const paypalCharge = resolvePayPalChargeForPlan(plan);
+    const expectedCurrency = paypalCharge.currencyCode;
+    const expectedAmountCents = paypalCharge.amountCents;
 
     if (!capturedAmountCents || capturedCurrencyCode !== expectedCurrency) {
       throw new HttpError(
@@ -893,11 +933,10 @@ router.post('/paypal/orders/:orderId/capture', async (request, response, next) =
 
         const user = userRows[0];
 
-        // Set the admin as the subscription owner
-        await client.query(
-          `UPDATE companies SET owner_id = $1 WHERE id = $2`,
-          [user.id, company.id]
-        );
+        await setCompanyOwnerIfSupported(client, {
+          companyId: company.id,
+          ownerId: user.id,
+        });
 
         const { rows: subscriptionRows } = await client.query(
           `INSERT INTO company_subscriptions (
