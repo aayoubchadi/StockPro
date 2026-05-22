@@ -252,7 +252,7 @@ async function buildTenantLoginPayload({ companyId, userId }) {
       maxEmployees: Number(tenantContext.max_employees || 0),
       canExportReports: Boolean(tenantContext.can_export_reports),
       canUseAdvancedAnalytics: Boolean(tenantContext.can_use_advanced_analytics),
-      currencyCode: String(tenantContext.currency_code || 'EUR').toUpperCase(),
+      currencyCode: String(tenantContext.currency_code || 'MAD').toUpperCase(),
     },
   };
 }
@@ -314,7 +314,7 @@ function mapPlanRow(plan) {
     code: plan.code,
     name: plan.name,
     monthlyPriceCents: Number(plan.monthly_price_cents),
-    currencyCode: String(plan.currency_code || 'EUR').toUpperCase(),
+    currencyCode: String(plan.currency_code || 'MAD').toUpperCase(),
     maxEmployees: Number(plan.max_employees),
     features: {
       canExportReports: Boolean(plan.can_export_reports),
@@ -329,7 +329,7 @@ function getFallbackPlans() {
       code: 'starter_20',
       name: 'Starter 20',
       monthlyPriceCents: 7900,
-      currencyCode: 'EUR',
+      currencyCode: 'MAD',
       maxEmployees: 20,
       features: {
         canExportReports: false,
@@ -340,7 +340,7 @@ function getFallbackPlans() {
       code: 'growth_50',
       name: 'Growth 50',
       monthlyPriceCents: 14900,
-      currencyCode: 'EUR',
+      currencyCode: 'MAD',
 
       maxEmployees: 50,
       features: {
@@ -352,7 +352,7 @@ function getFallbackPlans() {
       code: 'enterprise_150',
       name: 'Enterprise 150',
       monthlyPriceCents: 29900,
-      currencyCode: 'EUR',
+      currencyCode: 'MAD',
       maxEmployees: 150,
       features: {
         canExportReports: true,
@@ -791,7 +791,7 @@ router.post('/paypal/orders/:orderId/capture', async (request, response, next) =
     );
     const capturedCustomId = normalizeValue(purchaseUnit?.custom_id);
 
-    if (!capturedAmountCents || capturedCurrencyCode !== String(plan.currency_code || 'EUR').toUpperCase()) {
+    if (!capturedAmountCents || capturedCurrencyCode !== String(plan.currency_code || 'MAD').toUpperCase()) {
       throw new HttpError(
         409,
         'PAYPAL_CAPTURE_AMOUNT_MISMATCH',
@@ -881,7 +881,7 @@ router.post('/paypal/orders/:orderId/capture', async (request, response, next) =
             plan.id,
             providerOrderId,
             Number(plan.monthly_price_cents),
-            String(plan.currency_code || 'EUR').toUpperCase(),
+            String(plan.currency_code || 'MAD').toUpperCase(),
             normalizeEmail(capturedOrder.raw?.payer?.email_address),
             JSON.stringify(capturedOrder.raw || {}),
           ]

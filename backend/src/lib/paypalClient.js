@@ -120,7 +120,7 @@ async function paypalApiRequest(path, { method = 'GET', body, requestId } = {}) 
 
 export async function createPayPalOrder({
   amountCents,
-  currencyCode = 'EUR',
+  currencyCode = 'MAD',
   description,
   customId,
   intent = 'CAPTURE',
@@ -142,7 +142,7 @@ export async function createPayPalOrder({
     );
   }
 
-  const normalizedCurrencyCode = String(currencyCode || 'EUR').toUpperCase();
+  const normalizedCurrencyCode = String(currencyCode || 'MAD').toUpperCase();
   const orderAmount = (amountCents / 100).toFixed(2);
 
   const payload = await paypalApiRequest('/v2/checkout/orders', {

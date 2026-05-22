@@ -35,7 +35,7 @@ const HomePage = () => {
               <div className="chart-bar" />
               <div className="metric-line">
                 <strong>Valeur stock</strong>
-                <span>173 000 EUR</span>
+                <span>173 000 MAD</span>
               </div>
               <div className="chart-bar chart-bar--medium" />
               <div className="metric-line">

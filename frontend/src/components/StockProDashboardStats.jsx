@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 
 const formatNumber = (value) => new Intl.NumberFormat().format(Number(value) || 0);
 
-const formatCurrency = (value, currencyCode = 'EUR') =>
+const formatCurrency = (value, currencyCode = 'MAD') =>
   new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency: currencyCode,
@@ -32,7 +32,7 @@ const CustomTooltip = ({ active, payload, label, scope }) => {
               <span className="text-slate-600 dark:text-slate-400">{entry.name}</span>
               <span className="font-semibold text-slate-900 dark:text-slate-100">
                 {scope === 'platform' && entry.dataKey === 'mrrCents'
-                  ? formatCurrency(entry.value / 100, 'EUR')
+                  ? formatCurrency(entry.value / 100, 'MAD')
                   : formatNumber(entry.value)}
               </span>
             </div>
@@ -143,7 +143,7 @@ export default function StockProDashboardStats({ overview }) {
           label: 'MRR',
           value: overview?.metrics?.monthlyRecurringRevenueCents || 0,
           icon: DollarSign,
-          format: (value) => formatCurrency(Number(value) / 100, 'EUR'),
+          format: (value) => formatCurrency(Number(value) / 100, 'MAD'),
         },
       ];
     }
@@ -175,7 +175,7 @@ export default function StockProDashboardStats({ overview }) {
         label: 'Stock Value',
         value: overview?.metrics?.stockValue || 0,
         icon: DollarSign,
-        format: (value) => formatCurrency(value, overview?.plan?.currencyCode || 'EUR'),
+        format: (value) => formatCurrency(value, overview?.plan?.currencyCode || 'MAD'),
       },
     ];
   }, [overview, scope]);

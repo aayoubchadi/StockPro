@@ -162,7 +162,7 @@ export default function ClientDashboardPage() {
                 <h3>Products Needing Reorder (Low Stock)</h3>
                 <ul className="dashboard-list">
                   {lowStockProducts.map((product) => (
-                    <li key={product.id}>
+                    <li key={product.id} style={{ cursor: 'pointer' }} onClick={() => navigate('/inventory')}>
                       <strong>{product.name} ({product.sku})</strong>
                       <span>{product.quantityInStock || 0} units in stock • Reorder needed</span>
                     </li>

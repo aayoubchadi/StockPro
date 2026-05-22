@@ -138,6 +138,7 @@ function buildTenantUserPayload(user) {
     companySlug: user.company_slug,
     fullName: user.full_name,
     email: user.email,
+    isActive: Boolean(user.is_active),
     role: user.role,
     scope: 'tenant',
     permissions: user.permissions || {},
@@ -156,7 +157,7 @@ function buildTenantUserPayload(user) {
       maxEmployees: Number(user.plan_max_employees || 0),
       canExportReports: Boolean(user.plan_can_export_reports),
       canUseAdvancedAnalytics: Boolean(user.plan_can_use_advanced_analytics),
-      currencyCode: String(user.plan_currency_code || 'EUR').toUpperCase(),
+      currencyCode: String(user.plan_currency_code || 'MAD').toUpperCase(),
     },
   };
 }
@@ -845,22 +846,7 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
         );
 
         if (activePasswordMatchedUsers.length === 0) {
-          if (env.autoApproveSignup) {
-            const candidate = passwordMatchedUsers[0];
-
-            await runWithCompanyScope(candidate.company_id, async (client) => {
-              await client.query(
-                `UPDATE users
-                 SET is_active = TRUE
-                 WHERE id = $1`,
-                [candidate.id]
-              );
-            });
-
-            resolvedCompanyId = candidate.company_id;
-          } else {
-            throw new HttpError(403, 'AUTH_ACCOUNT_DISABLED', 'Account is disabled');
-          }
+          throw new HttpError(403, 'AUTH_ACCOUNT_DISABLED', 'Account is disabled');
         } else {
           resolvedCompanyId = activePasswordMatchedUsers[0].company_id;
         }
@@ -917,18 +903,8 @@ router.post('/login', loginRateLimiter, async (request, response, next) => {
 
       const user = rows[0];
 
-      if (!user.is_active && env.autoApproveSignup) {
-        await runWithCompanyScope(user.company_id, async (client) => {
-          await client.query(
-            `UPDATE users
-             SET is_active = TRUE
-             WHERE id = $1`,
-            [user.id]
-          );
-        });
-
-        user.is_active = true;
-      }
+      // Do not auto-activate users during login. Inactive users must follow
+      // the normal approval flow and will receive a 403 'AUTH_ACCOUNT_DISABLED'.
 
       if (!user.is_active) {
         const pendingRequest = await findPendingJoinRequest({
@@ -1122,22 +1098,7 @@ router.post('/login/google', loginRateLimiter, async (request, response, next) =
         );
 
         if (activeMatchingUsers.length === 0) {
-          if (env.autoApproveSignup) {
-            const candidate = matchingUsers[0];
-
-            await runWithCompanyScope(candidate.company_id, async (client) => {
-              await client.query(
-                `UPDATE users
-                 SET is_active = TRUE
-                 WHERE id = $1`,
-                [candidate.id]
-              );
-            });
-
-            resolvedCompanyId = candidate.company_id;
-          } else {
-            throw new HttpError(403, 'AUTH_ACCOUNT_DISABLED', 'Account is disabled');
-          }
+          throw new HttpError(403, 'AUTH_ACCOUNT_DISABLED', 'Account is disabled');
         } else {
           resolvedCompanyId = activeMatchingUsers[0].company_id;
         }
@@ -1193,18 +1154,8 @@ router.post('/login/google', loginRateLimiter, async (request, response, next) =
 
       const user = rows[0];
 
-      if (!user.is_active && env.autoApproveSignup) {
-        await runWithCompanyScope(user.company_id, async (client) => {
-          await client.query(
-            `UPDATE users
-             SET is_active = TRUE
-             WHERE id = $1`,
-            [user.id]
-          );
-        });
-
-        user.is_active = true;
-      }
+      // Do not auto-activate users during Google login. Inactive users must
+      // follow the normal approval flow and will receive a 403 'AUTH_ACCOUNT_DISABLED'.
 
       if (!user.is_active) {
         const pendingRequest = await findPendingJoinRequest({

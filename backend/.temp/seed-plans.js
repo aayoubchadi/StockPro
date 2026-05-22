@@ -11,9 +11,9 @@ const pool = new pg.Pool({
 try {
   const plans = [
     { code: 'demo_free', name: 'Demo Free', price: 0, currency: 'USD', employees: 20, export: false, analytics: false },
-    { code: 'starter_20', name: 'Starter 20', price: 7900, currency: 'EUR', employees: 20, export: false, analytics: false },
-    { code: 'growth_50', name: 'Growth 50', price: 14900, currency: 'EUR', employees: 50, export: true, analytics: false },
-    { code: 'enterprise_150', name: 'Enterprise 150', price: 29900, currency: 'EUR', employees: 150, export: true, analytics: true },
+    { code: 'starter_20', name: 'Starter 20', price: 7900, currency: 'MAD', employees: 20, export: false, analytics: false },
+    { code: 'growth_50', name: 'Growth 50', price: 14900, currency: 'MAD', employees: 50, export: true, analytics: false },
+    { code: 'enterprise_150', name: 'Enterprise 150', price: 29900, currency: 'MAD', employees: 150, export: true, analytics: true },
   ];
 
   for (const plan of plans) {

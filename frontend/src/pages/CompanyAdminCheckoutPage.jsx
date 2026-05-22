@@ -31,7 +31,7 @@ function slugify(value) {
 function formatPrice(amountCents, currencyCode) {
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
-    currency: currencyCode || 'EUR',
+    currency: currencyCode || 'MAD',
     maximumFractionDigits: 0,
   }).format((Number(amountCents) || 0) / 100);
 }
@@ -238,7 +238,7 @@ export default function CompanyAdminCheckoutPage() {
 
     let isActive = true;
     const scriptId = 'paypal-js-sdk';
-    const sdkCurrency = String(selectedPlan.currencyCode || 'EUR').toUpperCase();
+    const sdkCurrency = String(selectedPlan.currencyCode || 'MAD').toUpperCase();
     const sdkSrc = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(
       paypalClientId
     )}&currency=${encodeURIComponent(sdkCurrency)}&intent=capture&components=buttons`;

@@ -7,7 +7,7 @@ import { useLanguage } from '../lib/i18n';
 import { approveJoinRequest, getDashboardOverview, rejectJoinRequest } from '../services/platformApi';
 import StockProDashboardStats from '../components/StockProDashboardStats';
 
-function formatCurrency(amount, currencyCode = 'EUR') {
+function formatCurrency(amount, currencyCode = 'MAD') {
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency: currencyCode,
@@ -179,7 +179,7 @@ export default function AdminDashboardPage() {
                   <article className="dashboard-box"><h3>Total companies</h3><p>{platformMetrics.totalCompanies || 0}</p></article>
                   <article className="dashboard-box"><h3>Active companies</h3><p>{platformMetrics.activeCompanies || 0}</p></article>
                   <article className="dashboard-box"><h3>Active users</h3><p>{platformMetrics.activeUsers || 0}</p></article>
-                  <article className="dashboard-box"><h3>MRR</h3><p>{formatCurrency(platformMetrics.monthlyRecurringRevenueCents || 0, 'EUR')}</p></article>
+                  <article className="dashboard-box"><h3>MRR</h3><p>{formatCurrency(platformMetrics.monthlyRecurringRevenueCents || 0, 'MAD')}</p></article>
                 </section>
 
                 <section className="dashboard-grid dashboard-grid-split">
@@ -201,7 +201,7 @@ export default function AdminDashboardPage() {
                       {(overview.planDistribution || []).map((plan) => (
                         <li key={plan.code}>
                           <strong>{plan.name}</strong>
-                          <span>{plan.companiesCount} companies • {formatCurrency(plan.monthlyRevenueCents || 0, 'EUR')} MRR</span>
+                          <span>{plan.companiesCount} companies • {formatCurrency(plan.monthlyRevenueCents || 0, 'MAD')} MRR</span>
                         </li>
                       ))}
                     </ul>
@@ -214,7 +214,7 @@ export default function AdminDashboardPage() {
                   <article className="dashboard-box"><h3>Active employees</h3><p>{tenantMetrics.activeEmployees || 0} / {overview.plan?.maxEmployees || 0}</p></article>
                   <article className="dashboard-box"><h3>Capacity used</h3><p>{tenantMetrics.employeeCapacityUsedPercent || 0}%</p></article>
                   <article className="dashboard-box"><h3>Active products</h3><p>{tenantMetrics.activeProducts || 0}</p></article>
-                  <article className="dashboard-box"><h3>Stock value</h3><p>{new Intl.NumberFormat(undefined, { style: 'currency', currency: overview.plan?.currencyCode || 'EUR', maximumFractionDigits: 0 }).format(tenantMetrics.stockValue || 0)}</p></article>
+                  <article className="dashboard-box"><h3>Stock value</h3><p>{new Intl.NumberFormat(undefined, { style: 'currency', currency: overview.plan?.currencyCode || 'MAD', maximumFractionDigits: 0 }).format(tenantMetrics.stockValue || 0)}</p></article>
                 </section>
 
                 <section className="dashboard-grid dashboard-grid-split">
@@ -284,7 +284,7 @@ export default function AdminDashboardPage() {
                       {(overview.topProducts || []).map((product) => (
                         <li key={product.id}>
                           <strong>{product.name} ({product.sku})</strong>
-                          <span>{product.quantityInStock} units • {formatCurrency(product.stockValue || 0, overview.plan?.currencyCode || 'EUR')}</span>
+                          <span>{product.quantityInStock} units • {formatCurrency(product.stockValue || 0, overview.plan?.currencyCode || 'MAD')}</span>
                         </li>
                       ))}
                     </ul>

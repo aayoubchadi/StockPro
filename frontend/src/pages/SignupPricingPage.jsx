@@ -7,7 +7,7 @@ import { getBillingPlans } from '../services/platformApi';
 
 const SIGNUP_PREFILL_KEY = 'company-admin-signup';
 
-function formatPrice(amountCents, currencyCode = 'EUR') {
+function formatPrice(amountCents, currencyCode = 'MAD') {
     return new Intl.NumberFormat(undefined, {
         style: 'currency',
         currency: currencyCode,

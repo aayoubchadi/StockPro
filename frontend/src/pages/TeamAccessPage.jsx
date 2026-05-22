@@ -125,6 +125,8 @@ export default function TeamAccessPage() {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeactivationDialogOpen, setIsDeactivationDialogOpen] = useState(false);
+  const [deactivationTarget, setDeactivationTarget] = useState(null);
   const [form, setForm] = useState(DEFAULT_FORM);
   const toastTimerRef = useRef(null);
 
@@ -218,6 +220,22 @@ export default function TeamAccessPage() {
   const adminEmployees = useMemo(
     () => employees.filter((employee) => employee.role === 'company_admin').length,
     [employees]
+  );
+
+  // Helper: Identify subscription creator (first company_admin by creation date)
+  const getSubscriptionCreator = useMemo(() => {
+    const admins = employees.filter((e) => e.role === 'company_admin');
+    if (admins.length === 0) return null;
+    return admins.reduce((earliest, current) => {
+      const earliestDate = new Date(earliest.createdAt);
+      const currentDate = new Date(current.createdAt);
+      return currentDate < earliestDate ? current : earliest;
+    });
+  }, [employees]);
+
+  const isCurrentUserSubscriptionCreator = useMemo(
+    () => session?.user?.id === getSubscriptionCreator?.id,
+    [session?.user?.id, getSubscriptionCreator]
   );
 
   const openAddDialog = () => {
@@ -326,7 +344,71 @@ export default function TeamAccessPage() {
   };
 
   const toggleEmployeeStatus = async (employee) => {
-    if (!accessToken) {
+    // If activating, no restrictions
+    if (!employee.isActive) {
+      setIsUpdating(true);
+      setMessage('');
+      setMessageType('');
+
+      try {
+        await updateCompanyEmployeeStatus({
+          accessToken,
+          employeeId: employee.id,
+          isActive: true,
+        });
+
+        await loadData();
+      } catch (error) {
+        setMessage(error.message || 'Unable to update employee status.');
+        setMessageType('error');
+      } finally {
+        setIsUpdating(false);
+      }
+      return;
+    }
+
+    // Check role-based deactivation permissions
+    const currentUserRole = session?.user?.role;
+    const targetRole = employee.role;
+    const isOwnAccount = session?.user?.id === employee.id;
+
+    // Employees cannot deactivate anyone
+    if (currentUserRole === 'employee') {
+      setMessage('Employees do not have permission to deactivate accounts.');
+      setMessageType('error');
+      return;
+    }
+
+    // Subscription creator (first admin) cannot deactivate themselves
+    if (isCurrentUserSubscriptionCreator && isOwnAccount) {
+      setMessage('Your account is protected and cannot be deactivated.');
+      setMessageType('error');
+      return;
+    }
+
+    // Co-admin who is NOT subscription creator
+    if (currentUserRole === 'company_admin' && !isCurrentUserSubscriptionCreator) {
+      // Cannot deactivate themselves
+      if (isOwnAccount) {
+        setMessage('You cannot deactivate your own account.');
+        setMessageType('error');
+        return;
+      }
+      // Cannot deactivate other co-admins
+      if (targetRole === 'company_admin') {
+        setMessage('Co-admins cannot deactivate other co-admins.');
+        setMessageType('error');
+        return;
+      }
+    }
+
+    // If deactivating, show confirmation dialog
+    setDeactivationTarget(employee);
+    setIsDeactivationDialogOpen(true);
+  };
+
+  const handleConfirmDeactivation = async () => {
+    if (!accessToken || !deactivationTarget) {
       return;
     }
 
@@ -337,17 +419,26 @@ export default function TeamAccessPage() {
     try {
       await updateCompanyEmployeeStatus({
         accessToken,
-        employeeId: employee.id,
-        isActive: !employee.isActive,
+        employeeId: deactivationTarget.id,
+        isActive: false,
       });
 
+      setMessage(`${deactivationTarget.fullName} has been deactivated.`);
+      setMessageType('success');
+      setIsDeactivationDialogOpen(false);
+      setDeactivationTarget(null);
       await loadData();
     } catch (error) {
-      setMessage(error.message || 'Unable to update employee status.');
+      setMessage(error.message || 'Unable to deactivate employee.');
       setMessageType('error');
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  const handleCancelDeactivation = () => {
+    setIsDeactivationDialogOpen(false);
+    setDeactivationTarget(null);
   };
 
   return (
@@ -660,6 +751,49 @@ export default function TeamAccessPage() {
               </section>
             ) : null}
 
+            {isDeactivationDialogOpen && deactivationTarget ? (
+              <section className="rounded-lg border border-red-200 bg-red-50 p-5 dark:border-red-900 dark:bg-red-950">
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold text-red-900 dark:text-red-100">
+                    Deactivate Employee
+                  </h3>
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    This action will deactivate the employee account
+                  </p>
+                </div>
+                <div className="mb-6">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    Are you sure you want to deactivate <strong>{deactivationTarget.fullName}</strong>? 
+                    They will not be able to access the system until reactivated.
+                  </p>
+                  {deactivationTarget.role === 'company_admin' && (
+                    <p className="mt-3 rounded bg-red-100 p-2 text-sm font-semibold text-red-900 dark:bg-red-900 dark:text-red-100">
+                      ⚠️ This is an admin account. Deactivating will reduce available admin access.
+                    </p>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button 
+                    variant="outline" 
+                    type="button" 
+                    onClick={handleCancelDeactivation}
+                    disabled={isUpdating}
+                    className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleConfirmDeactivation}
+                    disabled={isUpdating}
+                    className="!bg-red-600 !text-white hover:!bg-red-700 font-semibold px-6 border-0"
+                    style={{ backgroundColor: '#dc2626', color: 'white' }}
+                  >
+                    {isUpdating ? 'Deactivating...' : 'Deactivate'}
+                  </Button>
+                </div>
+              </section>
+            ) : null}
+
             <div className="rounded-lg border bg-card">
               <Table>
                 <TableHeader>
@@ -742,8 +876,24 @@ export default function TeamAccessPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => toggleEmployeeStatus(employee)}
-                                disabled={isUpdating}
-                                className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                disabled={
+                                  isUpdating ||
+                                  (employee.isActive && (
+                                    session?.user?.role === 'employee' ||
+                                    (isCurrentUserSubscriptionCreator && session?.user?.id === employee.id) ||
+                                    (session?.user?.role === 'company_admin' && !isCurrentUserSubscriptionCreator && session?.user?.id === employee.id) ||
+                                    (session?.user?.role === 'company_admin' && !isCurrentUserSubscriptionCreator && employee.role === 'company_admin')
+                                  ))
+                                }
+                                title={
+                                  !employee.isActive ? '' :
+                                  session?.user?.role === 'employee' ? 'Employees cannot deactivate accounts' :
+                                  isCurrentUserSubscriptionCreator && session?.user?.id === employee.id ? 'Subscription creator account is protected' :
+                                  session?.user?.role === 'company_admin' && !isCurrentUserSubscriptionCreator && session?.user?.id === employee.id ? 'You cannot deactivate your own account' :
+                                  session?.user?.role === 'company_admin' && !isCurrentUserSubscriptionCreator && employee.role === 'company_admin' ? 'Co-admins cannot deactivate other co-admins' :
+                                  ''
+                                }
+                                className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 {employee.isActive ? 'Deactivate' : 'Activate'}
                               </Button>

@@ -260,7 +260,7 @@ async function buildTenantOverview(companyId) {
         name: company.plan_name,
         maxEmployees,
         monthlyPriceCents: toNumber(company.monthly_price_cents),
-        currencyCode: String(company.currency_code || 'EUR').toUpperCase(),
+        currencyCode: String(company.currency_code || 'MAD').toUpperCase(),
         canExportReports: Boolean(company.can_export_reports),
         canUseAdvancedAnalytics: Boolean(company.can_use_advanced_analytics),
       },

@@ -4,7 +4,7 @@ import PageBackground from '../components/PageBackground';
 import { getSession } from '../lib/authStore';
 import { getCompanyContext } from '../services/companyApi';
 
-function formatCurrency(amountCents, currencyCode = 'EUR') {
+function formatCurrency(amountCents, currencyCode = 'MAD') {
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency: currencyCode,

@@ -21,6 +21,13 @@ export default function LoginPage() {
 
   const completeLogin = useCallback(
     (data, fallbackEmail) => {
+      // If account is deactivated, show inline disabled message
+      if (data.user?.isActive === false) {
+        setMessage('Your account has been disabled. Please contact your workspace administrator.');
+        setMessageType('error');
+        return;
+      }
+
       saveSession({
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
@@ -73,6 +80,19 @@ export default function LoginPage() {
 
       completeLogin(data, normalizedUsername);
     } catch (error) {
+      const msg = String(error?.message || '').toLowerCase();
+      if (msg.includes('disabled')) {
+        setMessage('Your account has been disabled. Please contact your workspace administrator.');
+        setMessageType('error');
+        return;
+      }
+
+      if (msg.includes('pending')) {
+        setMessage('Your account access request is pending approval.');
+        setMessageType('error');
+        return;
+      }
+
       setMessage(error.message || t('auth.login.invalidCredentials'));
       setMessageType('error');
     } finally {

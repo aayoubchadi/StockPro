@@ -131,7 +131,7 @@ export default function LandingPage() {
     },
   ];
 
-  const formatPrice = (amount, currencyCode = 'EUR') => {
+  const formatPrice = (amount, currencyCode = 'MAD') => {
     return new Intl.NumberFormat(undefined, {
       style: 'currency',
       currency: currencyCode,

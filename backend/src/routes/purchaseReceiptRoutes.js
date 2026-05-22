@@ -37,7 +37,7 @@ function parseReceiptDate(input) {
 }
 
 function formatMoney(value, currencyCode) {
-    const safeCurrency = String(currencyCode || 'EUR').toUpperCase();
+    const safeCurrency = String(currencyCode || 'MAD').toUpperCase();
     const amount = Number.isFinite(value) ? value : 0;
     try {
         return new Intl.NumberFormat('en-US', {
@@ -171,7 +171,7 @@ router.get('/:id/pdf', async (request, response, next) => {
 
         const { rows: items } = await db.query('SELECT ri.*, p.sku, p.name FROM purchase_receipt_items ri JOIN products p ON ri.product_id = p.id WHERE ri.receipt_id = $1', [id]);
 
-        const currency = request.tenant.plan?.currencyCode || 'EUR';
+        const currency = request.tenant.plan?.currencyCode || 'MAD';
         const companyName = request.tenant.company?.name || 'Company';
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
         const chunks = [];

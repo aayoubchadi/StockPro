@@ -144,7 +144,7 @@ export async function loadTenantContext({ companyId, userId }) {
         name: row.plan_name,
         maxEmployees,
         monthlyPriceCents: toNumber(row.monthly_price_cents, 0),
-        currencyCode: String(row.currency_code || 'EUR').toUpperCase(),
+        currencyCode: String(row.currency_code || 'MAD').toUpperCase(),
         canExportReports: Boolean(row.can_export_reports),
         canUseAdvancedAnalytics: Boolean(row.can_use_advanced_analytics),
       },
