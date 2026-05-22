@@ -1,6 +1,6 @@
 -- StockPro database schema (multi-tenant)
 -- Run with:
---   PGPASSWORD="<postgres_password>" "C:\\dev\\PostGreSQL\\bin\\psql.exe" -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/schema.sql
+--   PGPASSWORD="<postgres_password>" psql -U postgres -h localhost -p 9100 -d stockpro_db -f backend/db/schema.sql
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS citext;
@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
   currency_code CHAR(3) NOT NULL DEFAULT 'MAD',
   paypal_plan_reference VARCHAR(120),
   max_employees INTEGER NOT NULL CHECK (max_employees BETWEEN 20 AND 150),
+  max_admins INTEGER NOT NULL DEFAULT 2 CHECK (max_admins BETWEEN 1 AND 10),
   can_export_reports BOOLEAN NOT NULL DEFAULT FALSE,
   can_use_advanced_analytics BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -103,6 +104,7 @@ CREATE TABLE IF NOT EXISTS companies (
   name VARCHAR(180) NOT NULL UNIQUE,
   slug VARCHAR(120) NOT NULL UNIQUE,
   subscription_plan_id UUID NOT NULL REFERENCES subscription_plans(id),
+  owner_id UUID REFERENCES users(id),
   is_demo BOOLEAN NOT NULL DEFAULT FALSE,
   demo_expires_at TIMESTAMPTZ,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -621,10 +623,49 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION enforce_admin_limit()
+RETURNS TRIGGER AS $$
+DECLARE
+  plan_limit INTEGER;
+  current_count INTEGER;
+BEGIN
+  IF NEW.role = 'company_admin' AND NEW.is_active = TRUE THEN
+    SELECT sp.max_admins
+      INTO plan_limit
+      FROM companies c
+      JOIN subscription_plans sp ON sp.id = c.subscription_plan_id
+     WHERE c.id = NEW.company_id;
+
+    IF plan_limit IS NULL THEN
+      RAISE EXCEPTION 'Company % does not have a valid subscription plan.', NEW.company_id;
+    END IF;
+
+    SELECT COUNT(*)
+      INTO current_count
+     FROM users u
+     WHERE u.company_id = NEW.company_id
+      AND u.role = 'company_admin'
+       AND u.is_active = TRUE
+       AND (TG_OP = 'INSERT' OR u.id <> NEW.id);
+
+    IF current_count + 1 > plan_limit THEN
+      RAISE EXCEPTION 'Admin limit exceeded for company %. Plan allows % admins.', NEW.company_id, plan_limit;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 DROP TRIGGER IF EXISTS trg_users_enforce_employee_limit ON users;
 CREATE TRIGGER trg_users_enforce_employee_limit
 BEFORE INSERT OR UPDATE OF role, company_id, is_active ON users
 FOR EACH ROW EXECUTE FUNCTION enforce_employee_limit();
+
+DROP TRIGGER IF EXISTS trg_users_enforce_admin_limit ON users;
+CREATE TRIGGER trg_users_enforce_admin_limit
+BEFORE INSERT OR UPDATE OF role, company_id, is_active ON users
+FOR EACH ROW EXECUTE FUNCTION enforce_admin_limit();
 
 CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);
 CREATE INDEX IF NOT EXISTS idx_users_company_role ON users(company_id, role);

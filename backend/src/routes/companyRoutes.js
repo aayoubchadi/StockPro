@@ -362,7 +362,7 @@ router.get('/context', async (request, response, next) => {
         },
         company: request.tenantContext.company,
         plan: request.tenantContext.plan,
-        capacity: request.tenantContext.capacity,
+        capacity: request.tenantContext.metrics,
         permissionPresets: Object.values(PERMISSION_PRESETS),
       },
     });
@@ -401,7 +401,7 @@ router.get(
       response.json({
         data: {
           employees: rows.map(serializeEmployeeRow),
-          capacity: request.tenantContext.capacity,
+          capacity: request.tenantContext.metrics,
         },
       });
     } catch (error) {
@@ -430,11 +430,11 @@ router.post(
         );
       }
 
-      if (role !== 'employee' && role !== 'company_admin' && role !== 'special_employee') {
+      if (role !== 'employee' && role !== 'special_employee') {
         throw new HttpError(
           400,
           'COMPANY_VALIDATION_ERROR',
-          'role must be employee, special_employee, or company_admin'
+          'role must be employee or special_employee. Company admins can only be created during subscription checkout.'
         );
       }
 
@@ -560,6 +560,20 @@ router.post(
         return;
       }
 
+      if (
+        error?.code === 'P0001' &&
+        String(error.message || '').includes('Admin limit exceeded')
+      ) {
+        next(
+          new HttpError(
+            409,
+            'COMPANY_ADMIN_LIMIT_REACHED',
+            'Admin limit exceeded for the current subscription plan'
+          )
+        );
+        return;
+      }
+
       next(error);
     }
   }
@@ -624,6 +638,24 @@ router.patch(
           }
 
           const existing = employeeRows[0];
+
+          // Prevent modification of subscription owner
+          const { rows: companyRows } = await client.query(
+            `SELECT owner_id FROM companies WHERE id = $1`,
+            [request.tenantContext.company.id]
+          );
+          if (
+            companyRows.length > 0 &&
+            companyRows[0].owner_id === employeeId &&
+            (hasNameUpdate || hasPermissionUpdate)
+          ) {
+            throw new HttpError(
+              403,
+              'COMPANY_OWNER_PROTECTED',
+              'The subscription owner account cannot be modified'
+            );
+          }
+
           const userHasPermissionsColumn = Object.prototype.hasOwnProperty.call(
             existing,
             'permissions'
@@ -712,8 +744,25 @@ router.patch(
 
       const { rows } = await runWithCompanyScope(
         request.tenantContext.company.id,
-        (client) =>
-          client.query(
+        async (client) => {
+          // Prevent deactivation of subscription owner
+          const { rows: companyRows } = await client.query(
+            `SELECT owner_id FROM companies WHERE id = $1`,
+            [request.tenantContext.company.id]
+          );
+          if (
+            companyRows.length > 0 &&
+            companyRows[0].owner_id === employeeId &&
+            isActive === false
+          ) {
+            throw new HttpError(
+              403,
+              'COMPANY_OWNER_PROTECTED',
+              'The subscription owner account cannot be deactivated'
+            );
+          }
+
+          return client.query(
             `UPDATE users
              SET is_active = $3
              WHERE id = $1
@@ -721,7 +770,8 @@ router.patch(
                AND role IN ('employee', 'special_employee', 'company_admin')
              RETURNING id, company_id, full_name, email::text AS email, role, permissions, is_active, created_at, updated_at`,
             [employeeId, request.tenantContext.company.id, isActive]
-          )
+          );
+        }
       );
 
       if (rows.length !== 1) {

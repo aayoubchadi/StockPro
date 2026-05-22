@@ -689,6 +689,17 @@ router.post('/register', registerRateLimiter, async (request, response, next) =>
         );
       }
 
+      if (
+        dbError?.code === 'P0001' &&
+        String(dbError.message || '').includes('Admin limit exceeded')
+      ) {
+        throw new HttpError(
+          409,
+          'AUTH_VALIDATION_ERROR',
+          'Admin limit exceeded for the company subscription plan'
+        );
+      }
+
       throw dbError;
     }
   } catch (error) {

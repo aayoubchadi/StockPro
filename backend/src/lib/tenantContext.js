@@ -106,7 +106,9 @@ export async function loadTenantContext({ companyId, userId }) {
     const { rows: metricRows } = await client.query(
       `SELECT
          COUNT(*) FILTER (WHERE role IN ('employee', 'special_employee') AND is_active = TRUE) AS active_employees,
-         COUNT(*) FILTER (WHERE role IN ('employee', 'special_employee')) AS total_employees
+         COUNT(*) FILTER (WHERE role IN ('employee', 'special_employee')) AS total_employees,
+         COUNT(*) FILTER (WHERE role = 'company_admin' AND is_active = TRUE) AS active_admins,
+         COUNT(*) FILTER (WHERE role = 'company_admin') AS total_admins
        FROM users
        WHERE company_id = $1`,
       [companyId]
@@ -114,7 +116,9 @@ export async function loadTenantContext({ companyId, userId }) {
 
     const metrics = metricRows[0] || {};
     const maxEmployees = toNumber(row.max_employees, 0);
+    const maxAdmins = toNumber(row.max_admins, 2);
     const activeEmployees = toNumber(metrics.active_employees, 0);
+    const activeAdmins = toNumber(metrics.active_admins, 0);
     const effectivePermissions = resolveEffectivePermissions(
       row.role,
       row.permissions || {}
@@ -143,6 +147,7 @@ export async function loadTenantContext({ companyId, userId }) {
         code: row.plan_code,
         name: row.plan_name,
         maxEmployees,
+        maxAdmins,
         monthlyPriceCents: toNumber(row.monthly_price_cents, 0),
         currencyCode: String(row.currency_code || 'MAD').toUpperCase(),
         canExportReports: Boolean(row.can_export_reports),
@@ -153,6 +158,10 @@ export async function loadTenantContext({ companyId, userId }) {
         totalEmployees: toNumber(metrics.total_employees, 0),
         maxEmployees,
         employeeCapacityLeft: Math.max(0, maxEmployees - activeEmployees),
+        activeAdmins,
+        totalAdmins: toNumber(metrics.total_admins, 0),
+        maxAdmins,
+        adminCapacityLeft: Math.max(0, maxAdmins - activeAdmins),
       },
     };
   });

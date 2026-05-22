@@ -316,6 +316,7 @@ function mapPlanRow(plan) {
     monthlyPriceCents: Number(plan.monthly_price_cents),
     currencyCode: String(plan.currency_code || 'MAD').toUpperCase(),
     maxEmployees: Number(plan.max_employees),
+    maxAdmins: Number(plan.max_admins || 2),
     features: {
       canExportReports: Boolean(plan.can_export_reports),
       canUseAdvancedAnalytics: Boolean(plan.can_use_advanced_analytics),
@@ -331,6 +332,7 @@ function getFallbackPlans() {
       monthlyPriceCents: 7900,
       currencyCode: 'MAD',
       maxEmployees: 20,
+      maxAdmins: 1,
       features: {
         canExportReports: false,
         canUseAdvancedAnalytics: false,
@@ -341,8 +343,8 @@ function getFallbackPlans() {
       name: 'Growth 50',
       monthlyPriceCents: 14900,
       currencyCode: 'MAD',
-
       maxEmployees: 50,
+      maxAdmins: 2,
       features: {
         canExportReports: true,
         canUseAdvancedAnalytics: false,
@@ -354,6 +356,7 @@ function getFallbackPlans() {
       monthlyPriceCents: 29900,
       currencyCode: 'MAD',
       maxEmployees: 150,
+      maxAdmins: 5,
       features: {
         canExportReports: true,
         canUseAdvancedAnalytics: true,
@@ -372,6 +375,7 @@ router.get('/plans', async (_request, response, next) => {
          monthly_price_cents,
          currency_code,
          max_employees,
+         max_admins,
          can_export_reports,
          can_use_advanced_analytics
        FROM subscription_plans
@@ -567,6 +571,12 @@ router.post('/demo/paypal/orders/:orderId/verify', async (request, response, nex
         const { rows: userRows } = await client.query(userInsertSql, userInsertParams);
 
         const user = userRows[0];
+
+        // Set the admin as the subscription owner
+        await client.query(
+          `UPDATE companies SET owner_id = $1 WHERE id = $2`,
+          [user.id, company.id]
+        );
 
         await client.query(
           `INSERT INTO demo_verifications (
@@ -861,6 +871,12 @@ router.post('/paypal/orders/:orderId/capture', async (request, response, next) =
 
         const user = userRows[0];
 
+        // Set the admin as the subscription owner
+        await client.query(
+          `UPDATE companies SET owner_id = $1 WHERE id = $2`,
+          [user.id, company.id]
+        );
+
         const { rows: subscriptionRows } = await client.query(
           `INSERT INTO company_subscriptions (
              company_id,
@@ -995,6 +1011,17 @@ router.post('/paypal/orders/:orderId/capture', async (request, response, next) =
           500,
           'BILLING_DB_POLICY_ERROR',
           'Billing write was blocked by database policy configuration'
+        )
+      );
+      return;
+    }
+
+    if (error?.code === 'P0001' && String(error.message || '').includes('Admin limit exceeded')) {
+      next(
+        new HttpError(
+          409,
+          'BILLING_ADMIN_LIMIT_REACHED',
+          'Admin limit exceeded for the subscription plan'
         )
       );
       return;

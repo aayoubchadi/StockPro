@@ -44,20 +44,22 @@ INSERT INTO subscription_plans (
   monthly_price_cents,
   currency_code,
   max_employees,
+  max_admins,
   can_export_reports,
   can_use_advanced_analytics
 )
 VALUES
-  ('demo_free', 'Demo Free', 0, 'USD', 20, FALSE, FALSE),
-  ('starter_20', 'Starter 20', 7900, 'EUR', 20, FALSE, FALSE),
-  ('growth_50', 'Growth 50', 14900, 'EUR', 50, TRUE, FALSE),
-  ('enterprise_150', 'Enterprise 150', 29900, 'EUR', 150, TRUE, TRUE)
+  ('demo_free', 'Demo Free', 0, 'USD', 20, 2, FALSE, FALSE),
+  ('starter_20', 'Starter 20', 7900, 'EUR', 20, 1, FALSE, FALSE),
+  ('growth_50', 'Growth 50', 14900, 'EUR', 50, 2, TRUE, FALSE),
+  ('enterprise_150', 'Enterprise 150', 29900, 'EUR', 150, 5, TRUE, TRUE)
 ON CONFLICT (code) DO UPDATE
 SET
   name = EXCLUDED.name,
   monthly_price_cents = EXCLUDED.monthly_price_cents,
   currency_code = EXCLUDED.currency_code,
   max_employees = EXCLUDED.max_employees,
+  max_admins = EXCLUDED.max_admins,
   can_export_reports = EXCLUDED.can_export_reports,
   can_use_advanced_analytics = EXCLUDED.can_use_advanced_analytics;
 
