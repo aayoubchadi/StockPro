@@ -134,9 +134,9 @@ export default function LandingPage() {
   const formatPrice = (amount, currencyCode = 'MAD') => {
     return new Intl.NumberFormat(undefined, {
       style: 'currency',
-      currency: currencyCode,
+      currency: 'MAD',
       maximumFractionDigits: 0,
-    }).format(amount);
+    }).format(amount * 10);
   };
 
   const handlePricingChoiceClick = (event, planCode) => {
@@ -273,7 +273,7 @@ export default function LandingPage() {
 
               <div className="lp-plan-price-wrap">
                 <p className="lp-plan-price">
-                  {formatPrice(0, 'USD')}
+                  {formatPrice(0, 'MAD')}
                   <span> / {t('landing.pricing.perMonth')}</span>
                 </p>
                 <p className="lp-plan-unit">
@@ -311,7 +311,7 @@ export default function LandingPage() {
 
                   <div className="lp-plan-price-wrap">
                     <p className="lp-plan-price">
-                      {formatPrice(monthlyPrice, plan.currencyCode)}
+                      {formatPrice(monthlyPrice, 'MAD')}
                       <span> / {t('landing.pricing.perMonth')}</span>
                     </p>
                     <p className="lp-plan-unit">

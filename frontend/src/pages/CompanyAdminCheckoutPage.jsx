@@ -34,9 +34,9 @@ function slugify(value) {
 function formatPrice(amountCents, currencyCode) {
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
-    currency: currencyCode || 'MAD',
+    currency: 'MAD',
     maximumFractionDigits: 0,
-  }).format((Number(amountCents) || 0) / 100);
+  }).format(((Number(amountCents) || 0) / 100) * 10);
 }
 
 function validateAdminPassword(password, email) {
@@ -187,11 +187,11 @@ export default function CompanyAdminCheckoutPage() {
   const paypalSdkCurrency = useMemo(() => {
     const metadataPlanCode = String(checkoutMetadata?.plan?.code || '').trim();
     if (!metadataPlanCode || metadataPlanCode !== selectedPlan?.code) {
-      return '';
+      return 'MAD';
     }
 
     const metadataCurrency = String(checkoutMetadata?.payment?.currencyCode || '').trim().toUpperCase();
-    return metadataCurrency;
+    return metadataCurrency || 'MAD';
   }, [checkoutMetadata?.payment?.currencyCode, checkoutMetadata?.plan?.code, selectedPlan?.code]);
 
   const finalizeApprovedOrder = useCallback(async (orderId) => {

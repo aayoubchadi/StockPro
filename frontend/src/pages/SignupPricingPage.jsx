@@ -10,9 +10,9 @@ const SIGNUP_PREFILL_KEY = 'company-admin-signup';
 function formatPrice(amountCents, currencyCode = 'MAD') {
     return new Intl.NumberFormat(undefined, {
         style: 'currency',
-        currency: currencyCode,
+        currency: 'MAD',
         maximumFractionDigits: 0,
-    }).format((Number(amountCents) || 0) / 100);
+    }).format(((Number(amountCents) || 0) / 100) * 10);
 }
 
 export default function SignupPricingPage() {
@@ -130,7 +130,7 @@ export default function SignupPricingPage() {
 
                                 <div className="lp-plan-price-wrap">
                                     <p className="lp-plan-price">
-                                        {formatPrice(plan.monthlyPriceCents, plan.currencyCode)}
+                                        {formatPrice(plan.monthlyPriceCents, 'MAD')}
                                         <span> / {t('landing.pricing.perMonth')}</span>
                                     </p>
                                     <p className="lp-plan-unit">

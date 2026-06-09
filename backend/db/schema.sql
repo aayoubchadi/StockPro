@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
   code VARCHAR(50) NOT NULL UNIQUE,
   name VARCHAR(120) NOT NULL,
   monthly_price_cents INTEGER NOT NULL DEFAULT 0 CHECK (monthly_price_cents >= 0),
-  currency_code CHAR(3) NOT NULL DEFAULT 'MAD',
+  currency_code CHAR(3) NOT NULL DEFAULT 'EUR',
   paypal_plan_reference VARCHAR(120),
   max_employees INTEGER NOT NULL CHECK (max_employees BETWEEN 20 AND 150),
   max_admins INTEGER NOT NULL DEFAULT 2 CHECK (max_admins BETWEEN 1 AND 10),

@@ -317,7 +317,7 @@ export default function CompanyAdminInfoPage() {
                                                         onClick={() => setSelectedPlanCode(plan.code)}
                                                     >
                                                         <strong>{plan.name}</strong>
-                                                        <span>{(plan.monthlyPriceCents / 100).toFixed(0)} {plan.currencyCode} / month</span>
+                                                        <span>{((plan.monthlyPriceCents / 100) * 10).toFixed(0)} MAD / month</span>
                                                         <small>{plan.maxEmployees} users included</small>
                                                     </button>
                                                 );
@@ -458,7 +458,7 @@ export default function CompanyAdminInfoPage() {
                                     </div>
                                     <div className="checkout-summary-row">
                                         <span>Price</span>
-                                        <strong>{(selectedPlan.monthlyPriceCents / 100).toFixed(0)} {selectedPlan.currencyCode}</strong>
+                                        <strong>{((selectedPlan.monthlyPriceCents / 100) * 10).toFixed(0)} MAD</strong>
                                     </div>
                                     <div className="checkout-summary-row">
                                         <span>Users included</span>

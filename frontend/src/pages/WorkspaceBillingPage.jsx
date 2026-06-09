@@ -7,9 +7,9 @@ import { getCompanyContext } from '../services/companyApi';
 function formatCurrency(amountCents, currencyCode = 'MAD') {
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
-    currency: currencyCode,
+    currency: 'MAD',
     maximumFractionDigits: 0,
-  }).format((Number(amountCents || 0) || 0) / 100);
+  }).format(((Number(amountCents || 0) || 0) / 100) * 10);
 }
 
 export default function WorkspaceBillingPage() {
@@ -62,7 +62,7 @@ export default function WorkspaceBillingPage() {
             </article>
             <article className="dashboard-box">
               <h3>Monthly price</h3>
-              <p>{formatCurrency(context.plan?.monthlyPriceCents, context.plan?.currencyCode)}</p>
+              <p>{formatCurrency(context.plan?.monthlyPriceCents, 'MAD')}</p>
             </article>
             <article className="dashboard-box">
               <h3>Employee capacity</h3>

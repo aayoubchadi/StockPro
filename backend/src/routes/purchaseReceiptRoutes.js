@@ -122,7 +122,6 @@ function renderLineItems(doc, items, currency, startY) {
 
 router.use(requireAuth);
 router.use(requireTenantAccess);
-router.use(requireTenantPermission('receipts.create'));
 
 router.get('/products', async (request, response, next) => {
     try {
@@ -135,6 +134,8 @@ router.get('/products', async (request, response, next) => {
         next(error);
     }
 });
+
+router.use(requireTenantPermission('receipts.create'));
 
 router.get('/', async (request, response, next) => {
     try {

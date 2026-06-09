@@ -114,7 +114,7 @@ const translations = {
                 perMonth: 'month',
                 perUser: 'per user / month',
                 demoNote: 'Free demo workspace',
-                demoHoldNote: 'Temporary $1 verification hold, then immediate release.',
+                demoHoldNote: 'Temporary 1 MAD verification hold, then immediate release.',
                 planDescription: 'Up to {count} users included',
                 planCta: 'Pay with PayPal',
                 planSeatLabel: '{count} active employee seats',
