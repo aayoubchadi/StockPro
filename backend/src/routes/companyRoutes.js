@@ -14,7 +14,11 @@ import {
   PERMISSION_PRESETS,
 } from '../lib/permissions.js';
 import { runWithCompanyScope } from '../lib/tenantContext.js';
-import { buildUserPermissionsSelect, buildUserPermissionsInsertFragments } from '../lib/userCompatibility.js';
+import {
+  buildUserPermissionsSelect,
+  buildUserPermissionsInsertFragments,
+  hasUserPermissionsColumn,
+} from '../lib/userCompatibility.js';
 
 const router = Router();
 
@@ -622,6 +626,7 @@ router.patch(
       const { rows } = await runWithCompanyScope(
         request.tenantContext.company.id,
         async (client) => {
+          const userHasPermissionsColumn = await hasUserPermissionsColumn();
           const userPermissionsSelect = await buildUserPermissionsSelect('users', 'permissions');
           const { rows: employeeRows } = await client.query(
             `SELECT id, full_name, role, ${userPermissionsSelect}
@@ -656,10 +661,6 @@ router.patch(
             );
           }
 
-          const userHasPermissionsColumn = Object.prototype.hasOwnProperty.call(
-            existing,
-            'permissions'
-          );
           const ignorePermissions = existing.role === 'company_admin';
           const mergedPermissions = ignorePermissions
             ? {}

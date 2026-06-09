@@ -292,7 +292,7 @@ export default function TeamAccessPage() {
     setMessageType('');
 
     try {
-      const created = await createCompanyEmployee({
+      await createCompanyEmployee({
         accessToken,
         fullName: form.fullName,
         email: form.email,
@@ -302,15 +302,6 @@ export default function TeamAccessPage() {
         presetKey: form.presetKey || undefined,
         permissions: form.permissions,
       });
-
-      if (created?.employee?.id) {
-        await updateCompanyEmployee({
-          accessToken,
-          employeeId: created.employee.id,
-          fullName: form.fullName,
-          permissions: form.permissions,
-        });
-      }
 
       setMessage('Employee created successfully.');
       setMessageType('success');

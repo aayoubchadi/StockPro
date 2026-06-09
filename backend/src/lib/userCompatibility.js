@@ -36,6 +36,11 @@ export async function buildUserPermissionsSelect(alias = 'u', prefix = 'permissi
   return `'{}'::jsonb AS ${prefix}`;
 }
 
+export async function hasUserPermissionsColumn() {
+  const capabilities = await loadUserPermissionsColumnCapabilities();
+  return capabilities.hasPermissions;
+}
+
 export async function buildUserPermissionsInsertFragments() {
   const capabilities = await loadUserPermissionsColumnCapabilities();
 

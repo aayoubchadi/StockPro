@@ -18,6 +18,23 @@ function todayIsoDate() {
     return new Date().toISOString().slice(0, 10);
 }
 
+function normalizeReceiptProduct(product) {
+    const id = String(product?.id || '').trim();
+    const rawUnitPrice = product?.unitPrice ?? product?.unit_price ?? 0;
+    const unitPrice = Number(rawUnitPrice);
+
+    if (!id) {
+        return null;
+    }
+
+    return {
+        id,
+        sku: String(product?.sku || '').trim(),
+        name: String(product?.name || '').trim(),
+        unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+    };
+}
+
 async function fetchReceiptProducts({ accessToken }) {
     const response = await fetch(`${API_BASE_URL}/api/v1/purchase-receipts/products`, {
         headers: buildAuthHeaders(accessToken),
@@ -94,7 +111,12 @@ export default function CreatePurchaseReceiptPage() {
             try {
                 const data = await fetchReceiptProducts({ accessToken });
                 if (isActive) {
-                    setProducts(data?.products || []);
+                    const productRows = Array.isArray(data?.products)
+                        ? data.products
+                        : Array.isArray(data?.data?.products)
+                            ? data.data.products
+                            : [];
+                    setProducts(productRows.map(normalizeReceiptProduct).filter(Boolean));
                     setMessage('');
                     setMessageType('');
                 }
@@ -136,7 +158,7 @@ export default function CreatePurchaseReceiptPage() {
         setProductDraft((current) => ({
             ...current,
             productId,
-            unitPrice: product ? String(product.unit_price || 0) : current.unitPrice,
+            unitPrice: product ? String(product.unitPrice) : current.unitPrice,
         }));
     };
 
@@ -151,7 +173,7 @@ export default function CreatePurchaseReceiptPage() {
         const hasDraftUnitPrice = String(productDraft.unitPrice).trim().length > 0;
         const unitPrice = hasDraftUnitPrice
             ? Number(productDraft.unitPrice)
-            : Number(selectedProduct.unit_price || 0);
+            : Number(selectedProduct.unitPrice || 0);
 
         if (!Number.isFinite(quantity) || quantity <= 0) {
             setMessage('Quantity must be greater than zero');
@@ -297,14 +319,14 @@ export default function CreatePurchaseReceiptPage() {
                                 <label className="grid gap-2 text-sm text-slate-600">
                                     Product
                                     <select
-                                        className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                                        className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900"
                                         value={productDraft.productId}
                                         onChange={handleProductChange}
                                     >
                                         <option value="">Select a product</option>
                                         {products.map((product) => (
                                             <option key={product.id} value={product.id}>
-                                                {product.name} ({product.sku})
+                                                {product.name || 'Unnamed product'}{product.sku ? ` (${product.sku})` : ''}
                                             </option>
                                         ))}
                                     </select>

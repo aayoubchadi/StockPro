@@ -68,6 +68,14 @@ function validateAdminPassword(password, email) {
     return errors;
 }
 
+function formatPrice(amountCents, currencyCode = 'MAD') {
+    return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: currencyCode,
+        maximumFractionDigits: 0,
+    }).format((Number(amountCents) || 0) / 100);
+}
+
 function getCheckoutValidationError({ selectedPlan, form }) {
     if (!selectedPlan) {
         return 'Please select a subscription plan.';
@@ -317,7 +325,7 @@ export default function CompanyAdminInfoPage() {
                                                         onClick={() => setSelectedPlanCode(plan.code)}
                                                     >
                                                         <strong>{plan.name}</strong>
-                                                        <span>{((plan.monthlyPriceCents / 100) * 10).toFixed(0)} MAD / month</span>
+                                                        <span>{formatPrice(plan.monthlyPriceCents, plan.currencyCode)} / month</span>
                                                         <small>{plan.maxEmployees} users included</small>
                                                     </button>
                                                 );
@@ -458,7 +466,7 @@ export default function CompanyAdminInfoPage() {
                                     </div>
                                     <div className="checkout-summary-row">
                                         <span>Price</span>
-                                        <strong>{((selectedPlan.monthlyPriceCents / 100) * 10).toFixed(0)} MAD</strong>
+                                        <strong>{formatPrice(selectedPlan.monthlyPriceCents, selectedPlan.currencyCode)}</strong>
                                     </div>
                                     <div className="checkout-summary-row">
                                         <span>Users included</span>

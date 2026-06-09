@@ -34,9 +34,9 @@ function slugify(value) {
 function formatPrice(amountCents, currencyCode) {
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
-    currency: 'MAD',
+    currency: currencyCode || 'MAD',
     maximumFractionDigits: 0,
-  }).format(((Number(amountCents) || 0) / 100) * 10);
+  }).format((Number(amountCents) || 0) / 100);
 }
 
 function validateAdminPassword(password, email) {

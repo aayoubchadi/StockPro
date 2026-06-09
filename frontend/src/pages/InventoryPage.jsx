@@ -236,7 +236,7 @@ export default function InventoryPage() {
   const formatCurrency = (value) => {
     return Number(value || 0).toLocaleString('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'MAD',
       minimumFractionDigits: 2,
     });
   };

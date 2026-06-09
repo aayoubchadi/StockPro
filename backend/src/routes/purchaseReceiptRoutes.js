@@ -39,7 +39,7 @@ function parseReceiptDate(input) {
 
 function formatMoney(value, currencyCode) {
     const safeCurrency = String(currencyCode || 'MAD').toUpperCase();
-    const amount = Number.isFinite(value) ? value : 0;
+    const amount = toNumber(value, 0);
     try {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
@@ -125,9 +125,13 @@ router.use(requireTenantAccess);
 
 router.get('/products', async (request, response, next) => {
     try {
-        const { rows } = await db.query(
-            "SELECT id, sku, name, unit_price FROM products WHERE company_id = $1 ORDER BY name ASC",
-            [request.tenant.companyId]
+        const { rows } = await runWithCompanyScope(
+            request.tenant.companyId,
+            (client) =>
+                client.query(
+                    "SELECT id, sku, name, unit_price FROM products WHERE company_id = $1 ORDER BY name ASC",
+                    [request.tenant.companyId]
+                )
         );
         response.json({ products: rows });
     } catch (error) {

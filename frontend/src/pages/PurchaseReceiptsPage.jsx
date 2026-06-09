@@ -7,6 +7,15 @@ import { Link } from 'react-router-dom';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
+function formatMad(value) {
+    return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: 'MAD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(Number(value) || 0);
+}
+
 export default function PurchaseReceiptsPage() {
     const [session] = useState(() => getSession());
     const [receipts, setReceipts] = useState([]);
@@ -115,7 +124,7 @@ export default function PurchaseReceiptsPage() {
                                                 <td className="px-4 py-3 text-sm text-slate-900">{new Date(r.receipt_date).toLocaleDateString()}</td>
                                                 <td className="px-4 py-3 text-sm text-slate-600">{r.reference_number || '-'}</td>
                                                 <td className="px-4 py-3 text-sm text-slate-900">{r.buyer_name}</td>
-                                                <td className="px-4 py-3 text-sm text-slate-900 font-medium">${r.total}</td>
+                                                <td className="px-4 py-3 text-sm text-slate-900 font-medium">{formatMad(r.total)}</td>
                                                 <td className="px-4 py-3 text-right">
                                                     <button 
                                                         onClick={() => handleDownload(r.id, r.reference_number)} 

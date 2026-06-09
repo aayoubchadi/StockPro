@@ -131,12 +131,12 @@ export default function LandingPage() {
     },
   ];
 
-  const formatPrice = (amount, currencyCode = 'MAD') => {
+  const formatPrice = (amountCents, currencyCode = 'MAD') => {
     return new Intl.NumberFormat(undefined, {
       style: 'currency',
-      currency: 'MAD',
+      currency: currencyCode,
       maximumFractionDigits: 0,
-    }).format(amount * 10);
+    }).format((Number(amountCents) || 0) / 100);
   };
 
   const handlePricingChoiceClick = (event, planCode) => {
@@ -297,9 +297,6 @@ export default function LandingPage() {
             </article>
 
             {pricingPlans.slice(0, 2).map((plan) => {
-              const monthlyPriceCents = Number(plan.monthlyPriceCents || 0);
-              const monthlyPrice = monthlyPriceCents / 100;
-
               return (
                 <article key={plan.key} className={`lp-plan-card feature-card${plan.popular ? ' is-popular' : ''}`}>
                   {plan.popular ? <span className="lp-plan-badge">{t('landing.pricing.mostPopular')}</span> : null}
@@ -311,7 +308,7 @@ export default function LandingPage() {
 
                   <div className="lp-plan-price-wrap">
                     <p className="lp-plan-price">
-                      {formatPrice(monthlyPrice, 'MAD')}
+                      {formatPrice(plan.monthlyPriceCents, plan.currencyCode)}
                       <span> / {t('landing.pricing.perMonth')}</span>
                     </p>
                     <p className="lp-plan-unit">
